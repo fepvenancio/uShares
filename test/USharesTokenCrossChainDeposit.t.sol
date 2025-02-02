@@ -20,30 +20,30 @@ contract USharesTokenCrossChainDepositTest is BaseTest {
     MockRouter public mockRouter;
     PositionManager public positionManager;
     MockCCTP public mockCctp;
-    
+
     // Additional test accounts
     address public ccipAdmin;
     address public tokenPool;
-    
+
     // Constants
     string public constant NAME = "uShares";
     string public constant SYMBOL = "uSHR";
-    
+
     function setUp() public override {
         super.setUp();
-        
+
         ccipAdmin = makeAddr("ccipAdmin");
         tokenPool = makeAddr("tokenPool");
-        
+
         vm.startPrank(deployer);
-        
+
         // Deploy mock contracts
         mockRouter = new MockRouter();
         mockCctp = new MockCCTP();
-        
+
         // Deploy and configure PositionManager
         positionManager = new PositionManager(address(registry));
-        
+
         // Deploy token with deployer as owner
         token = new USharesToken(
             NAME,
@@ -55,22 +55,22 @@ contract USharesTokenCrossChainDepositTest is BaseTest {
             address(usdc),
             address(mockRouter)
         );
-        
+
         // Set vault registry in token contract
         token.setVaultRegistry(address(registry));
-        
+
         // Configure PositionManager permissions
         positionManager.configureHandler(address(token), true);
         positionManager.configureHandler(tokenPool, true);
-        
+
         // Configure token permissions for PositionManager
         token.configureMinter(address(positionManager), true);
         token.configureBurner(address(positionManager), true);
-        
+
         // Configure token permissions for tokenPool
         token.configureMinter(tokenPool, true);
         token.configureBurner(tokenPool, true);
-        
+
         vm.stopPrank();
 
         // Configure token pool using CCIP admin
@@ -89,7 +89,7 @@ contract USharesTokenCrossChainDepositTest is BaseTest {
 
     function test_CCTMessageId_Uniqueness() public {
         uint256 amount = 1000e6;
-        
+
         // First mint tokens to tokenPool
         vm.prank(address(positionManager));
         token.mint(tokenPool, amount * 2);
@@ -98,42 +98,46 @@ contract USharesTokenCrossChainDepositTest is BaseTest {
         vm.startPrank(ccipAdmin);
         token.configureTokenPool(tokenPool, true);
         vm.stopPrank();
-        
+
         // Create position for tokenPool
-        vm.startPrank(address(token));  // Use token instead of deployer since it's already a handler
+        vm.startPrank(address(token)); // Use token instead of deployer since it's already a handler
         // Create position directly without storing the key
         positionManager.createPosition(
-            tokenPool,          // owner
-            SOURCE_CHAIN,       // sourceChain
-            8453,              // destinationChain
-            address(vault),    // destinationVault
-            amount * 2         // shares
+            tokenPool, // owner
+            SOURCE_CHAIN, // sourceChain
+            8453, // destinationChain
+            address(vault), // destinationVault
+            amount * 2 // shares
         );
         vm.stopPrank();
-        
+
         vm.startPrank(tokenPool);
-        
-        bytes memory messageId1 = token.lockOrBurn(ICCTToken.LockOrBurnParams({
-            sender: tokenPool,
-            amount: amount,
-            destinationChainSelector: uint64(8453),
-            receiver: user2,
-            depositId: keccak256("test1")
-        }));
-        
+
+        bytes memory messageId1 = token.lockOrBurn(
+            ICCTToken.LockOrBurnParams({
+                sender: tokenPool,
+                amount: amount,
+                destinationChainSelector: uint64(8453),
+                receiver: user2,
+                depositId: keccak256("test1")
+            })
+        );
+
         // Advance block timestamp to ensure different message IDs
         skip(1000);
-        
-        bytes memory messageId2 = token.lockOrBurn(ICCTToken.LockOrBurnParams({
-            sender: tokenPool,
-            amount: amount,
-            destinationChainSelector: uint64(8453),
-            receiver: user2,
-            depositId: keccak256("test2")  // Different depositId
-        }));
-        
+
+        bytes memory messageId2 = token.lockOrBurn(
+            ICCTToken.LockOrBurnParams({
+                sender: tokenPool,
+                amount: amount,
+                destinationChainSelector: uint64(8453),
+                receiver: user2,
+                depositId: keccak256("test2") // Different depositId
+            })
+        );
+
         vm.stopPrank();
-        
+
         assertNotEq(keccak256(messageId1), keccak256(messageId2));
     }
-} 
+}

@@ -43,10 +43,7 @@ contract VaultRegistry is IVaultRegistry, Ownable {
         _initializeOwner(msg.sender);
     }
 
-    function registerVault(
-        uint32 chainId,
-        address vault
-    ) external override onlyOwner whenNotPaused {
+    function registerVault(uint32 chainId, address vault) external override onlyOwner whenNotPaused {
         Errors.verifyNotZero(chainId);
         Errors.verifyNotZero(vault);
 
@@ -54,13 +51,15 @@ contract VaultRegistry is IVaultRegistry, Ownable {
         bytes32 vaultKey = KeyManager.getVaultKey(chainId, vault);
 
         // Check vault doesn't exist
-        if (vaults[vaultKey].vaultAddress != address(0))
+        if (vaults[vaultKey].vaultAddress != address(0)) {
             revert Errors.VaultExists();
+        }
 
         // Validate vault implements ERC4626 and uses USDC
         ERC4626 vaultContract = ERC4626(vault);
-        if (address(vaultContract.asset()) != address(usdc))
+        if (address(vaultContract.asset()) != address(usdc)) {
             revert Errors.InvalidAsset();
+        }
 
         // Store vault info
         vaults[vaultKey] = DataTypes.VaultInfo({
@@ -78,11 +77,7 @@ contract VaultRegistry is IVaultRegistry, Ownable {
         emit VaultRegistered(chainId, vault, true);
     }
 
-    function updateVaultStatus(
-        uint32 chainId,
-        address vault,
-        bool active
-    ) external override onlyOwner whenNotPaused {
+    function updateVaultStatus(uint32 chainId, address vault, bool active) external override onlyOwner whenNotPaused {
         bytes32 vaultKey = KeyManager.getVaultKey(chainId, vault);
         DataTypes.VaultInfo storage vaultInfo = vaults[vaultKey];
         Errors.verifyNotZero(vaultInfo.vaultAddress);
@@ -91,13 +86,10 @@ contract VaultRegistry is IVaultRegistry, Ownable {
         emit VaultUpdated(chainId, vault, active);
     }
 
-    function removeVault(
-        uint32 chainId,
-        address vault
-    ) external override onlyOwner whenNotPaused {
+    function removeVault(uint32 chainId, address vault) external override onlyOwner whenNotPaused {
         bytes32 vaultKey = KeyManager.getVaultKey(chainId, vault);
         DataTypes.VaultInfo memory vaultInfo = vaults[vaultKey];
-        
+
         Errors.verifyNotZero(vaultInfo.vaultAddress);
         if (vaultInfo.active) revert Errors.VaultActive();
 
@@ -105,23 +97,15 @@ contract VaultRegistry is IVaultRegistry, Ownable {
         emit VaultRemoved(chainId, vault);
     }
 
-    function getVaultInfo(
-        uint32 chainId,
-        address vault
-    ) external view override returns (DataTypes.VaultInfo memory) {
+    function getVaultInfo(uint32 chainId, address vault) external view override returns (DataTypes.VaultInfo memory) {
         return vaults[KeyManager.getVaultKey(chainId, vault)];
     }
 
-    function isVaultActive(
-        uint32 chainId,
-        address vault
-    ) external view override returns (bool) {
+    function isVaultActive(uint32 chainId, address vault) external view override returns (bool) {
         return vaults[KeyManager.getVaultKey(chainId, vault)].active;
     }
 
-    function getChainVaults(
-        uint32 chainId
-    ) external view override returns (address[] memory) {
+    function getChainVaults(uint32 chainId) external view override returns (address[] memory) {
         return chainVaults[chainId];
     }
 

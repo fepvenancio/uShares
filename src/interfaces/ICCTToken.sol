@@ -19,4 +19,4 @@ interface ICCTToken {
 
     function lockOrBurn(LockOrBurnParams calldata params) external returns (bytes memory message);
     function releaseOrMint(ReleaseOrMintParams calldata params) external returns (uint256);
-} 
+}

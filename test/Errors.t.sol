@@ -23,7 +23,7 @@ contract ErrorsTest is Test {
     function test_VerifyNotZeroAddress() public {
         // Should not revert
         verifyAddress(address(0x123));
-        
+
         // Should revert
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAddress.selector, address(0)));
         verifyAddress(address(0));
@@ -31,10 +31,10 @@ contract ErrorsTest is Test {
 
     function test_VerifyNotZeroBytes() public {
         bytes32 validKey = bytes32(uint256(1));
-        
+
         // Should not revert
         verifyBytes32(validKey);
-        
+
         // Should revert
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroBytes.selector, bytes32(0)));
         verifyBytes32(bytes32(0));
@@ -43,7 +43,7 @@ contract ErrorsTest is Test {
     function test_VerifyNotZeroNumber() public {
         // Should not revert
         verifyUint256(1);
-        
+
         // Should revert
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroNumber.selector, 0));
         verifyUint256(0);

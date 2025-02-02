@@ -1,66 +1,150 @@
-## Foundry
+# uShares Protocol
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+## Overview
+uShares is a cross-chain protocol that enables users to access ERC4626 vault yields across different chains while maintaining their position on their source chain. By using Circle's CCTP for USDC bridging, users can deposit USDC on one chain and gain exposure to vault yields on another chain, receiving uShares tokens that represent their vault position.
 
-Foundry consists of:
+## Features
+- Cross-chain ERC4626 vault exposure
+- Source chain position management
+- USDC-denominated shares
+- Seamless integration with Circle's CCTP
+- Standardized CCT (Cross-Chain Token) implementation
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+## Architecture
 
-## Documentation
+### Key Components
+- **USharesToken**: Main contract handling deposits and share minting
+- **VaultRegistry**: Manages supported vaults across chains
+- **PositionManager**: Tracks user positions and share balances
+- **CCTP Integration**: Handles cross-chain USDC transfers
 
-https://book.getfoundry.sh/
+### Flow Diagram
+```mermaid
+sequenceDiagram
+    actor User
+    participant USharesToken
+    participant CCTP
+    participant ERC4626
+    
+    User->>USharesToken: initiateDeposit(USDC, vault)
+    USharesToken->>CCTP: depositForBurn(USDC)
+    CCTP-->>USharesToken: processCCTPCompletion()
+    USharesToken->>ERC4626: deposit(USDC)
+    ERC4626-->>USharesToken: return vaultShares
+    USharesToken->>USharesToken: mint uShares to user
+```
+
+## Installation
+
+```bash
+git clone https://github.com/yourusername/ushares-protocol
+cd ushares-protocol
+forge install
+```
 
 ## Usage
 
-### Build
-
-```shell
-$ forge build
+### Deploy Contracts
+```bash
+forge script scripts/deploy.s.sol --rpc-url  --broadcast
 ```
 
-### Test
-
-```shell
-$ forge test
+### Run Tests
+```bash
+forge test
 ```
 
-### Format
+### Example: Deposit USDC for Vault Shares
+```solidity
+// 1. Approve USDC
+IERC20(USDC).approve(address(uSharesToken), amount);
 
-```shell
-$ forge fmt
+// 2. Initiate deposit
+bytes32 depositId = uSharesToken.initiateDeposit(
+    targetVault,
+    usdcAmount,
+    destinationChainSelector,
+    minShares,
+    deadline
+);
 ```
 
-### Gas Snapshots
+## Configuration
 
-```shell
-$ forge snapshot
+### Environment Variables
+Create a `.env` file:
+```env
+PRIVATE_KEY=your_private_key
+RPC_URL=your_rpc_url
+ETHERSCAN_API_KEY=your_api_key
 ```
 
-### Anvil
+### Supported Networks
+- Ethereum Mainnet
+- Base
+- Arbitrum
+- Optimism
+- (Add more chains as needed)
 
-```shell
-$ anvil
+## Contract Addresses
+
+### Mainnet
+- USharesToken: `0x...`
+- VaultRegistry: `0x...`
+- PositionManager: `0x...`
+
+### Base
+- Vault: `0x...`
+(Add other chains)
+
+## Development
+
+### Prerequisites
+- Foundry
+- Node.js >= 14
+- Git
+
+### Local Setup
+1. Clone repository
+2. Install dependencies
+3. Copy `.env.example` to `.env`
+4. Configure environment variables
+
+### Testing
+```bash
+# Run all tests
+forge test
+
+# Run specific test
+forge test --match-test testDeposit
+
+# Run with verbosity
+forge test -vvv
 ```
 
-### Deploy
+## Security
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
+### Audits
+- [Audit 1](link_to_audit) - Date
+- [Audit 2](link_to_audit) - Date
 
-### Cast
+### Bug Bounty
+Visit our [bug bounty program](link) for details.
 
-```shell
-$ cast <subcommand>
-```
+## Contributing
+1. Fork the repository
+2. Create feature branch
+3. Commit changes
+4. Push to branch
+5. Create Pull Request
 
-### Help
+## License
+MIT
 
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+## Contact & Support
+- Discord: [Join](link)
+- Twitter: [@uShares](link)
+- Email: support@ushares.xyz
+
+## Documentation
+Full documentation available at [docs.ushares.xyz](link)

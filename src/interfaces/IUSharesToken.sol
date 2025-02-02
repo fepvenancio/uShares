@@ -48,38 +48,16 @@ interface IUSharesToken {
         uint256 minShares,
         uint256 deadline
     );
-    
-    event CCTPCompleted(
-        bytes32 indexed depositId,
-        uint256 usdcAmount,
-        uint32 destinationChain
-    );
-    
-    event SharesIssued(
-        bytes32 indexed depositId,
-        address indexed user,
-        uint256 shares
-    );
 
-    event VaultMapped(
-        uint32 indexed chainId,
-        address indexed localVault,
-        address indexed remoteVault
-    );
+    event CCTPCompleted(bytes32 indexed depositId, uint256 usdcAmount, uint32 destinationChain);
 
-    event TokensMinted(
-        address indexed to,
-        uint256 amount,
-        uint32 sourceChain,
-        bytes32 messageId
-    );
+    event SharesIssued(bytes32 indexed depositId, address indexed user, uint256 shares);
 
-    event TokensBurned(
-        address indexed from,
-        uint256 amount,
-        uint32 destinationChain,
-        bytes32 messageId
-    );
+    event VaultMapped(uint32 indexed chainId, address indexed localVault, address indexed remoteVault);
+
+    event TokensMinted(address indexed to, uint256 amount, uint32 sourceChain, bytes32 messageId);
+
+    event TokensBurned(address indexed from, uint256 amount, uint32 destinationChain, bytes32 messageId);
 
     // Role management events
     event MinterConfigured(address indexed minter, bool status);
@@ -98,22 +76,12 @@ interface IUSharesToken {
         uint256 deadline
     ) external returns (bytes32 depositId);
 
-    function processCCTPCompletion(
-        bytes32 depositId,
-        bytes memory attestation
-    ) external;
+    function processCCTPCompletion(bytes32 depositId, bytes memory attestation) external;
 
-    function mintSharesFromDeposit(
-        bytes32 depositId,
-        uint256 vaultShares
-    ) external;
+    function mintSharesFromDeposit(bytes32 depositId, uint256 vaultShares) external;
 
     // Admin functions
-    function setVaultMapping(
-        uint32 chainId,
-        address localVault,
-        address remoteVault
-    ) external;
+    function setVaultMapping(uint32 chainId, address localVault, address remoteVault) external;
 
     function setCCTPContract(address cctp) external;
     function setTokenPool(address pool) external;
@@ -130,4 +98,4 @@ interface IUSharesToken {
     function getChainId() external view returns (uint32);
     function getCCIPAdmin() external view returns (address);
     function getTokenPool() external view returns (address);
-} 
+}

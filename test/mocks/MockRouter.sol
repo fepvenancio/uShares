@@ -8,13 +8,10 @@ contract MockRouter is IRouter {
 
     error InvalidAddress();
 
-    function ccipSend(
-        uint64 destinationChainSelector,
-        bytes memory message
-    ) external returns (bytes32) {
+    function ccipSend(uint64 destinationChainSelector, bytes memory message) external returns (bytes32) {
         // Validate inputs
         if (msg.sender == address(0)) revert InvalidAddress();
-        
+
         bytes32 messageId = keccak256(abi.encode(destinationChainSelector, message));
         sentMessages[messageId] = true;
         return messageId;
@@ -23,4 +20,4 @@ contract MockRouter is IRouter {
     function getSentMessage(bytes32 messageId) external view returns (bool) {
         return sentMessages[messageId];
     }
-} 
+}

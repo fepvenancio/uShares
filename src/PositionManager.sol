@@ -73,12 +73,7 @@ contract PositionManager is IPositionManager, Ownable {
         }
 
         // Generate position key
-        positionKey = KeyManager.getPositionKey(
-            owner,
-            sourceChain,
-            destinationChain,
-            destinationVault
-        );
+        positionKey = KeyManager.getPositionKey(owner, sourceChain, destinationChain, destinationVault);
 
         // Check if position already exists
         if (positions[positionKey].active) revert Errors.PositionExists();
@@ -98,13 +93,7 @@ contract PositionManager is IPositionManager, Ownable {
         userPositions[owner].push(positionKey);
         chainPositions[sourceChain].push(positionKey);
 
-        emit PositionCreated(
-            owner,
-            sourceChain,
-            destinationChain,
-            destinationVault,
-            shares
-        );
+        emit PositionCreated(owner, sourceChain, destinationChain, destinationVault, shares);
     }
 
     /**
@@ -112,10 +101,7 @@ contract PositionManager is IPositionManager, Ownable {
      * @param positionKey Unique position identifier
      * @param newShares New share amount
      */
-    function updatePosition(
-        bytes32 positionKey,
-        uint256 newShares
-    ) external onlyHandler {
+    function updatePosition(bytes32 positionKey, uint256 newShares) external onlyHandler {
         // Validate input and position exists
         Errors.verifyNotZero(positionKey);
 
@@ -126,11 +112,7 @@ contract PositionManager is IPositionManager, Ownable {
         position.shares = newShares;
         position.timestamp = block.timestamp;
 
-        emit PositionUpdated(
-            positionKey,
-            newShares,
-            block.timestamp
-        );
+        emit PositionUpdated(positionKey, newShares, block.timestamp);
     }
 
     /**
@@ -155,9 +137,7 @@ contract PositionManager is IPositionManager, Ownable {
      * @param user User address
      * @return Array of position keys
      */
-    function getUserPositions(
-        address user
-    ) external view returns (bytes32[] memory) {
+    function getUserPositions(address user) external view returns (bytes32[] memory) {
         return userPositions[user];
     }
 
@@ -166,9 +146,7 @@ contract PositionManager is IPositionManager, Ownable {
      * @param sourceChain Source chain ID
      * @return Array of position keys
      */
-    function getChainPositions(
-        uint32 sourceChain
-    ) external view returns (bytes32[] memory) {
+    function getChainPositions(uint32 sourceChain) external view returns (bytes32[] memory) {
         return chainPositions[sourceChain];
     }
 
@@ -177,9 +155,7 @@ contract PositionManager is IPositionManager, Ownable {
      * @param positionKey Position identifier
      * @return bool Position status
      */
-    function isPositionActive(
-        bytes32 positionKey
-    ) external view returns (bool) {
+    function isPositionActive(bytes32 positionKey) external view returns (bool) {
         return positions[positionKey].active;
     }
 
@@ -188,9 +164,7 @@ contract PositionManager is IPositionManager, Ownable {
      * @param user User address
      * @return uint256 Number of positions
      */
-    function getUserPositionCount(
-        address user
-    ) external view returns (uint256) {
+    function getUserPositionCount(address user) external view returns (uint256) {
         return userPositions[user].length;
     }
 
@@ -199,9 +173,7 @@ contract PositionManager is IPositionManager, Ownable {
      * @param sourceChain Chain ID
      * @return uint256 Number of positions
      */
-    function getChainPositionCount(
-        uint32 sourceChain
-    ) external view returns (uint256) {
+    function getChainPositionCount(uint32 sourceChain) external view returns (uint256) {
         return chainPositions[sourceChain].length;
     }
 
@@ -215,28 +187,24 @@ contract PositionManager is IPositionManager, Ownable {
         return handlers[handler];
     }
 
-    function getPosition(
-        bytes32 positionKey
-    ) external view returns (Position memory) {
+    function getPosition(bytes32 positionKey) external view returns (Position memory) {
         Position memory pos = positions[positionKey];
-        return
-            Position({
-                owner: pos.owner,
-                sourceChain: pos.sourceChain,
-                destinationChain: pos.destinationChain,
-                destinationVault: pos.destinationVault,
-                shares: pos.shares,
-                active: pos.active,
-                timestamp: pos.timestamp
-            });
+        return Position({
+            owner: pos.owner,
+            sourceChain: pos.sourceChain,
+            destinationChain: pos.destinationChain,
+            destinationVault: pos.destinationVault,
+            shares: pos.shares,
+            active: pos.active,
+            timestamp: pos.timestamp
+        });
     }
 
-    function getPositionKey(
-        address owner,
-        uint32 sourceChain,
-        uint32 destinationChain,
-        address destinationVault
-    ) external pure returns (bytes32) {
+    function getPositionKey(address owner, uint32 sourceChain, uint32 destinationChain, address destinationVault)
+        external
+        pure
+        returns (bytes32)
+    {
         return KeyManager.getPositionKey(owner, sourceChain, destinationChain, destinationVault);
     }
 }

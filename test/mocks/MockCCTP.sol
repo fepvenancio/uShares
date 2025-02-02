@@ -16,23 +16,16 @@ contract MockCCTP is ICCTP {
         bytes32 destinationCaller
     );
 
-    event MintAndWithdraw(
-        address indexed mintRecipient,
-        uint256 amount,
-        address indexed mintToken
-    );
+    event MintAndWithdraw(address indexed mintRecipient, uint256 amount, address indexed mintToken);
 
     // State variables
     mapping(bytes32 => bool) public messages;
     mapping(bytes32 => bool) public verifiedMessages;
     uint64 private nonce;
 
-    function depositForBurn(
-        uint256 amount,
-        uint32 destinationDomain,
-        bytes32 mintRecipient,
-        address burnToken
-    ) external {
+    function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken)
+        external
+    {
         require(amount > 0, "Amount must be nonzero");
         require(mintRecipient != bytes32(0), "Mint recipient must be nonzero");
         require(burnToken != address(0), "Invalid token");
@@ -40,9 +33,7 @@ contract MockCCTP is ICCTP {
         // Increment nonce for unique message ID
         nonce++;
 
-        bytes32 messageHash = keccak256(
-            abi.encode(amount, destinationDomain, mintRecipient, nonce)
-        );
+        bytes32 messageHash = keccak256(abi.encode(amount, destinationDomain, mintRecipient, nonce));
         messages[messageHash] = true;
 
         // Emit event matching Circle's TokenMessenger
@@ -58,30 +49,21 @@ contract MockCCTP is ICCTP {
         );
     }
 
-    function receiveMessage(
-        bytes memory message,
-        bytes memory attestation
-    ) external override returns (bool) {
+    function receiveMessage(bytes memory message, bytes memory attestation) external override returns (bool) {
         bytes32 messageHash = keccak256(message);
         require(verifiedMessages[messageHash], "Message not verified");
-        
+
         // Parse message to emit MintAndWithdraw event
-        (address recipient, uint256 amount, address token) = abi.decode(
-            message,
-            (address, uint256, address)
-        );
-        
+        (address recipient, uint256 amount, address token) = abi.decode(message, (address, uint256, address));
+
         emit MintAndWithdraw(recipient, amount, token);
-        
+
         messages[messageHash] = true;
         return true;
     }
 
-    function verifyMessageHash(
-        bytes memory message,
-        bytes memory attestation
-    ) external view override returns (bool) {
+    function verifyMessageHash(bytes memory message, bytes memory attestation) external view override returns (bool) {
         bytes32 messageHash = keccak256(message);
         return verifiedMessages[messageHash];
     }
-} 
+}

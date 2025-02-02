@@ -32,9 +32,7 @@ contract MockVault is ERC4626 {
     }
 
     // Override previewDeposit to return a predictable amount
-    function previewDeposit(
-        uint256 assets
-    ) public pure override returns (uint256) {
+    function previewDeposit(uint256 assets) public pure override returns (uint256) {
         return assets; // 1:1 ratio for testing
     }
-} 
+}

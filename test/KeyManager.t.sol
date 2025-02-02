@@ -59,26 +59,19 @@ contract KeyManagerTest is Test {
         assertFalse(KeyManager.isValidVaultKey(bytes32(0)));
     }
 
-    function testFuzz_GetPositionKey(
-        address user,
-        uint32 chainId,
-        address vault
-    ) public {
+    function testFuzz_GetPositionKey(address user, uint32 chainId, address vault) public {
         vm.assume(user != address(0));
         vm.assume(chainId != 0);
         vm.assume(vault != address(0));
-        
+
         bytes32 key = KeyManager.getPositionKey(user, chainId, DEST_CHAIN, vault);
         assertTrue(KeyManager.isValidPositionKey(key));
     }
 
-    function testFuzz_GetVaultKey(
-        uint32 chainId,
-        address vault
-    ) public {
+    function testFuzz_GetVaultKey(uint32 chainId, address vault) public {
         vm.assume(chainId != 0);
         vm.assume(vault != address(0));
-        
+
         bytes32 key = KeyManager.getVaultKey(chainId, vault);
         assertTrue(KeyManager.isValidVaultKey(key));
     }

@@ -14,6 +14,7 @@ interface IPositionManager {
         uint256 timestamp;
     }
     // Events
+
     event PositionCreated(
         address indexed user,
         uint32 indexed sourceChain,
@@ -22,11 +23,7 @@ interface IPositionManager {
         uint256 shares
     );
 
-    event PositionUpdated(
-        bytes32 indexed positionKey,
-        uint256 newShares,
-        uint256 timestamp
-    );
+    event PositionUpdated(bytes32 indexed positionKey, uint256 newShares, uint256 timestamp);
 
     event PositionClosed(bytes32 indexed positionKey);
 
@@ -49,30 +46,20 @@ interface IPositionManager {
 
     function closePosition(bytes32 positionKey) external;
 
-    function getPosition(
-        bytes32 positionKey
-    ) external view returns (Position memory);
+    function getPosition(bytes32 positionKey) external view returns (Position memory);
 
-    function getUserPositions(
-        address user
-    ) external view returns (bytes32[] memory);
+    function getUserPositions(address user) external view returns (bytes32[] memory);
 
-    function getChainPositions(
-        uint32 chainId
-    ) external view returns (bytes32[] memory);
+    function getChainPositions(uint32 chainId) external view returns (bytes32[] memory);
 
     function isPositionActive(bytes32 positionKey) external view returns (bool);
 
-    function getChainPositionCount(
-        uint32 sourceChain
-    ) external view returns (uint256);
+    function getChainPositionCount(uint32 sourceChain) external view returns (uint256);
 
     function getUserPositionCount(address user) external view returns (uint256);
 
-    function getPositionKey(
-        address owner,
-        uint32 sourceChain,
-        uint32 destinationChain,
-        address destinationVault
-    ) external pure returns (bytes32);
+    function getPositionKey(address owner, uint32 sourceChain, uint32 destinationChain, address destinationVault)
+        external
+        pure
+        returns (bytes32);
 }
