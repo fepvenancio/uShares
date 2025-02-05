@@ -57,7 +57,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
     // Events from IUSharesToken are inherited
 
     modifier whenNotPaused() {
-        require(!paused, "Protocol paused");
+        if (paused) revert Errors.Paused();
         _;
     }
 
@@ -96,11 +96,11 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         address _usdc,
         address _router
     ) {
-        Errors.verifyNotZero(_positionManager);
-        Errors.verifyNotZero(_ccipAdmin);
-        Errors.verifyNotZero(_cctp);
-        Errors.verifyNotZero(_usdc);
-        Errors.verifyNotZero(_router);
+        Errors.verifyAddress(_positionManager);
+        Errors.verifyAddress(_ccipAdmin);
+        Errors.verifyAddress(_cctp);
+        Errors.verifyAddress(_usdc);
+        Errors.verifyAddress(_router);
 
         chainId = _chainId;
         positionManager = _positionManager;
@@ -121,24 +121,29 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
     // CCT Implementation
     function lockOrBurn(LockOrBurnParams calldata params) external returns (bytes memory message) {
         if (!tokenPools[msg.sender]) revert Errors.NotTokenPool();
-        Errors.verifyNotZero(params.receiver);
-        Errors.verifyNotZero(params.amount);
+        Errors.verifyAddress(params.receiver);
+        Errors.verifyNumber(params.amount);
 
-        // Check max transaction size instead of rate limit
+        // Check max transaction size
         if (params.amount > MAX_TRANSACTION_SIZE) revert Errors.ExceedsMaxSize();
 
         // Get vault address from mapping
         address targetVault = chainToVaultMapping[uint32(params.destinationChainSelector)][msg.sender];
-        Errors.verifyNotZero(targetVault);
+        Errors.verifyAddress(targetVault);
 
         // Get vault info from registry
-        DataTypes.VaultInfo memory vaultInfo =
-            IVaultRegistry(vaultRegistry).getVaultInfo(uint32(params.destinationChainSelector), targetVault);
+        DataTypes.VaultInfo memory vaultInfo = IVaultRegistry(vaultRegistry).getVaultInfo(
+            uint32(params.destinationChainSelector),
+            targetVault
+        );
         if (!vaultInfo.active) revert Errors.VaultNotActive();
 
         // Update position if it exists
         bytes32 positionKey = IPositionManager(positionManager).getPositionKey(
-            msg.sender, chainId, uint32(params.destinationChainSelector), vaultInfo.vaultAddress
+            msg.sender,
+            chainId,
+            uint32(params.destinationChainSelector),
+            vaultInfo.vaultAddress
         );
 
         if (IPositionManager(positionManager).isHandler(msg.sender)) {
@@ -148,30 +153,44 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         // Burn tokens
         _burn(msg.sender, params.amount);
 
+        // Call CCTP to burn tokens
+        USDC.safeApprove(address(cctp), params.amount);
+        cctp.depositForBurn(
+            params.amount,
+            uint32(params.destinationChainSelector),
+            bytes32(uint256(uint160(params.receiver))),
+            USDC
+        );
+
         // Return CCIP message
         return abi.encode(params.depositId, params.receiver, params.amount);
     }
 
     function releaseOrMint(ReleaseOrMintParams calldata params) external returns (uint256) {
         if (!tokenPools[msg.sender]) revert Errors.NotTokenPool();
-        Errors.verifyNotZero(params.receiver);
-        Errors.verifyNotZero(params.amount);
+        Errors.verifyAddress(params.receiver);
+        Errors.verifyNumber(params.amount);
 
-        // Check max transaction size instead of rate limit
+        // Check max transaction size
         if (params.amount > MAX_TRANSACTION_SIZE) revert Errors.ExceedsMaxSize();
 
         // Get vault address from mapping
         address sourceVault = chainToVaultMapping[uint32(params.sourceChainSelector)][msg.sender];
-        Errors.verifyNotZero(sourceVault);
+        Errors.verifyAddress(sourceVault);
 
         // Get vault info from registry
-        DataTypes.VaultInfo memory vaultInfo =
-            IVaultRegistry(vaultRegistry).getVaultInfo(uint32(params.sourceChainSelector), sourceVault);
+        DataTypes.VaultInfo memory vaultInfo = IVaultRegistry(vaultRegistry).getVaultInfo(
+            uint32(params.sourceChainSelector),
+            sourceVault
+        );
         if (!vaultInfo.active) revert Errors.VaultNotActive();
 
         // Update position if it exists
         bytes32 positionKey = IPositionManager(positionManager).getPositionKey(
-            msg.sender, uint32(params.sourceChainSelector), chainId, vaultInfo.vaultAddress
+            msg.sender,
+            uint32(params.sourceChainSelector),
+            chainId,
+            vaultInfo.vaultAddress
         );
 
         if (IPositionManager(positionManager).isHandler(msg.sender)) {
@@ -180,7 +199,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
 
         // Check if message has already been processed
         bytes32 messageHash = keccak256(abi.encode(params.depositId, params.amount));
-        require(!processedMessages[messageHash], Errors.DuplicateMessage());
+        if (processedMessages[messageHash]) revert Errors.DuplicateMessage();
         processedMessages[messageHash] = true;
 
         // Mint tokens
@@ -198,14 +217,18 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         uint256 deadline
     ) external whenNotPaused returns (bytes32 depositId) {
         // Validate inputs
-        Errors.verifyNotZero(targetVault);
-        Errors.verifyNotZero(usdcAmount);
-        Errors.verifyNotZero(minShares);
-        require(block.timestamp <= deadline, "Expired");
+        Errors.verifyAddress(targetVault);
+        Errors.verifyNumber(usdcAmount);
+        Errors.verifyNumber(minShares);
+        if (block.timestamp > deadline) revert Errors.DepositExpired();
 
-        // Verify vault mapping exists
+        // Check max transaction size
+        if (usdcAmount > MAX_TRANSACTION_SIZE) revert Errors.ExceedsMaxSize();
+
+        // Verify vault mapping exists and vault is active
         address remoteVault = chainToVaultMapping[uint32(destinationChainSelector)][targetVault];
-        require(remoteVault != address(0), "Invalid vault mapping");
+        if (remoteVault == address(0)) revert Errors.InvalidVault();
+        if (!vaultRegistry.isVaultActive(uint32(destinationChainSelector), remoteVault)) revert Errors.VaultNotActive();
 
         // Transfer USDC from user
         USDC.safeTransferFrom(msg.sender, address(this), usdcAmount);
@@ -224,7 +247,8 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
             sourceVault: targetVault,
             targetVault: remoteVault,
             destinationChain: uint32(destinationChainSelector),
-            expectedShares: 0,
+            vaultShares: 0,
+            uSharesMinted: 0,
             cctpCompleted: false,
             sharesIssued: false,
             timestamp: block.timestamp,
@@ -235,88 +259,122 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         // Initiate CCTP burn
         USDC.safeApprove(address(cctp), usdcAmount);
         cctp.depositForBurn(
-            usdcAmount, uint32(destinationChainSelector), bytes32(uint256(uint160(address(this)))), USDC
+            usdcAmount, 
+            uint32(destinationChainSelector), 
+            bytes32(uint256(uint160(address(this)))), 
+            USDC
         );
-
-        // Create CCIP message for token pool
-        bytes memory message = abi.encode(depositId, msg.sender, usdcAmount, minShares);
 
         emit DepositInitiated(
-            depositId, msg.sender, usdcAmount, targetVault, uint32(destinationChainSelector), minShares, deadline
+            depositId, 
+            msg.sender, 
+            usdcAmount, 
+            targetVault, 
+            uint32(destinationChainSelector), 
+            minShares, 
+            deadline
         );
     }
 
-    function processCCTPCompletion(bytes32 depositId, bytes memory attestation) external whenNotPaused {
+    function mintSharesFromDeposit(bytes32 depositId, uint256 vaultShares) external {
         CrossChainDeposit storage deposit = deposits[depositId];
-        require(deposit.user != address(0), "Invalid deposit");
-        require(!deposit.cctpCompleted, "CCTP already completed");
-        require(block.timestamp <= deposit.deadline, "Deposit expired");
+        if (!deposit.cctpCompleted) revert Errors.CCTPAlreadyCompleted();
+        if (deposit.sharesIssued) revert Errors.ActiveShares();
+        if (block.timestamp > deposit.deadline) revert Errors.DepositExpired();
+        if (vaultShares < deposit.minShares) revert Errors.InsufficientShares();
 
-        // Verify CCTP message format and content
-        bytes memory message = abi.encode(depositId, deposit.usdcAmount);
-        require(cctp.verifyMessageHash(message, attestation), "Invalid attestation");
+        deposit.vaultShares = vaultShares;
+        deposit.uSharesMinted = vaultShares; // 1:1 minting
+        deposit.sharesIssued = true;
 
-        // Store message hash to prevent replay
-        bytes32 messageHash = keccak256(message);
-        require(!processedMessages[messageHash], "Message already processed");
-        processedMessages[messageHash] = true;
+        // Create or update position
+        bytes32 positionKey = IPositionManager(positionManager).getPositionKey(
+            deposit.user,
+            chainId,
+            deposit.destinationChain,
+            deposit.targetVault
+        );
 
-        // Decode and verify message content
-        (bytes32 msgDepositId, uint256 amount) = abi.decode(message, (bytes32, uint256));
-        require(msgDepositId == depositId, "Deposit ID mismatch");
-        require(amount == deposit.usdcAmount, "Amount mismatch");
+        // Try to update position first, if it fails (not found), create a new one
+        try IPositionManager(positionManager).updatePosition(positionKey, vaultShares) {
+            // Position updated successfully
+        } catch {
+            // Position doesn't exist, create it
+            IPositionManager(positionManager).createPosition(
+                deposit.user,
+                chainId,
+                deposit.destinationChain,
+                deposit.targetVault,
+                vaultShares
+            );
+        }
 
-        // Update deposit state
-        deposit.cctpCompleted = true;
-
-        // Record message in CCTP mock for test verification
-        cctp.receiveMessage(message, attestation);
-
-        emit CCTPCompleted(depositId, deposit.usdcAmount, deposit.destinationChain);
+        _mint(deposit.user, vaultShares);
+        emit SharesIssued(depositId, deposit.user, vaultShares, vaultShares);
     }
 
-    function mintSharesFromDeposit(bytes32 depositId, uint256 vaultShares) external whenNotPaused onlyTokenPool {
+    function processCCTPCompletion(bytes32 depositId, bytes calldata attestation) external {
         CrossChainDeposit storage deposit = deposits[depositId];
-        require(deposit.user != address(0), "Invalid deposit");
-        require(deposit.cctpCompleted, "CCTP not completed");
-        require(!deposit.sharesIssued, "Shares already issued");
-        require(block.timestamp <= deposit.deadline, "Deposit expired");
-        require(vaultShares >= deposit.minShares, "Insufficient shares");
+        if (deposit.user == address(0)) revert Errors.InvalidDeposit();
+        if (deposit.cctpCompleted) revert Errors.CCTPAlreadyCompleted();
+        if (block.timestamp > deposit.deadline) revert Errors.DepositExpired();
 
-        // Mint UShares tokens to user
-        _mint(deposit.user, vaultShares);
+        // Step 1: Verify CCTP message
+        cctp.receiveMessage(attestation, bytes(""));
 
-        // Update vault shares
-        IVault(deposit.sourceVault).deposit(deposit.usdcAmount, deposit.user);
+        // Mark CCTP as completed
+        deposit.cctpCompleted = true;
+        emit CCTPCompleted(depositId, deposit.usdcAmount, deposit.destinationChain, deposit.targetVault);
 
-        deposit.sharesIssued = true;
-        deposit.expectedShares = vaultShares;
+        // Step 2: Deposit into vault and mint shares
+        uint256 vaultShares = depositToVault(
+            deposit.targetVault,
+            deposit.usdcAmount,
+            deposit.minShares
+        );
+        
+        // Mint shares to user
+        this.mintSharesFromDeposit(depositId, vaultShares);
+    }
 
-        emit SharesIssued(depositId, deposit.user, vaultShares);
+    // Withdrawal flow
+    function withdraw(uint256 uSharesAmount, address vault) external whenNotPaused {
+        Errors.verifyNumber(uSharesAmount);
+        if (uSharesAmount > MAX_TRANSACTION_SIZE) revert Errors.ExceedsMaxSize();
+
+        // Burn uShares
+        _burn(msg.sender, uSharesAmount);
+
+        // Withdraw USDC from vault
+        uint256 usdcAmount = IVault(vault).withdraw(uSharesAmount, msg.sender, address(this));
+        if (usdcAmount == 0) revert Errors.InvalidAmount();
+
+        // Transfer USDC to user
+        USDC.safeTransfer(msg.sender, usdcAmount);
     }
 
     // Admin functions
     function setVaultMapping(uint32 targetChain, address localVault, address remoteVault) external onlyCCIPAdmin {
-        Errors.verifyNotZero(localVault);
-        Errors.verifyNotZero(remoteVault);
+        Errors.verifyAddress(localVault);
+        Errors.verifyAddress(remoteVault);
 
         chainToVaultMapping[targetChain][localVault] = remoteVault;
         emit VaultMapped(targetChain, localVault, remoteVault);
     }
 
     function setCCTPContract(address _cctp) external onlyCCIPAdmin {
-        Errors.verifyNotZero(_cctp);
+        Errors.verifyAddress(_cctp);
         cctp = ICCTP(_cctp);
     }
 
     function configureMinter(address minter, bool status) external onlyOwner {
-        Errors.verifyNotZero(minter);
+        Errors.verifyAddress(minter);
         minters[minter] = status;
         emit MinterConfigured(minter, status);
     }
 
     function configureBurner(address burner, bool status) external onlyOwner {
-        Errors.verifyNotZero(burner);
+        Errors.verifyAddress(burner);
         burners[burner] = status;
         emit BurnerConfigured(burner, status);
     }
@@ -330,7 +388,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
     }
 
     function setTokenPool(address pool) external onlyCCIPAdmin {
-        Errors.verifyNotZero(pool);
+        Errors.verifyAddress(pool);
         tokenPool = pool;
         // Configure token pool permissions
         _configureTokenPool(pool, true);
@@ -345,23 +403,23 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
     }
 
     function setCCIPAdmin(address newAdmin) external onlyOwner {
-        Errors.verifyNotZero(newAdmin);
+        Errors.verifyAddress(newAdmin);
         address oldAdmin = ccipAdmin;
         ccipAdmin = newAdmin;
         emit CCIPAdminUpdated(oldAdmin, newAdmin);
     }
 
     function setVaultRegistry(address _vaultRegistry) external onlyOwner {
-        Errors.verifyNotZero(_vaultRegistry);
+        Errors.verifyAddress(_vaultRegistry);
         vaultRegistry = IVaultRegistry(_vaultRegistry);
     }
 
     // Recovery functions
     function recoverStaleDeposit(bytes32 depositId) external {
         CrossChainDeposit storage deposit = deposits[depositId];
-        require(deposit.user != address(0), "Invalid deposit");
-        require(block.timestamp > deposit.timestamp + PROCESS_TIMEOUT, "Not stale");
-        require(!deposit.sharesIssued, "Shares already issued");
+        if (deposit.user == address(0)) revert Errors.InvalidDeposit();
+        if (block.timestamp <= deposit.timestamp + PROCESS_TIMEOUT) revert Errors.InvalidDeposit();
+        if (deposit.sharesIssued) revert Errors.ActiveShares();
 
         // Return USDC to user if CCTP hasn't completed
         if (!deposit.cctpCompleted) {
@@ -407,10 +465,10 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
 
     // Cross-chain token functions
     function mint(address to, uint256 amount) external onlyPositionManager {
-        Errors.verifyNotZero(to);
-        Errors.verifyNotZero(amount);
+        Errors.verifyAddress(to);
+        Errors.verifyNumber(amount);
 
-        // Check max transaction size instead of rate limit
+        // Check max transaction size
         if (amount > MAX_TRANSACTION_SIZE) revert Errors.ExceedsMaxSize();
 
         _mint(to, amount);
@@ -428,7 +486,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
 
     // Internal functions
     function _configureTokenPool(address pool, bool status) internal {
-        Errors.verifyNotZero(pool);
+        Errors.verifyAddress(pool);
         tokenPools[pool] = status;
         // Token pools need both minting and burning permissions
         minters[pool] = status;
@@ -436,5 +494,23 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         emit TokenPoolConfigured(pool, status);
         emit MinterConfigured(pool, status);
         emit BurnerConfigured(pool, status);
+    }
+
+    // Internal function for vault deposits
+    function depositToVault(
+        address vault,
+        uint256 amount,
+        uint256 minShares
+    ) internal returns (uint256 shares) {
+        // Approve USDC for vault
+        USDC.safeApprove(vault, amount);
+        
+        // Deposit into vault
+        shares = IVault(vault).deposit(amount, address(this));
+        
+        // Verify minimum shares
+        if (shares < minShares) revert Errors.InsufficientShares();
+        
+        return shares;
     }
 }

@@ -2,50 +2,64 @@
 pragma solidity 0.8.28;
 
 library Errors {
-    error InvalidAmount();
-    error InvalidChain();
-    error InvalidVault();
-    error VaultNotActive();
-    error VaultActive();
-    error PositionNotFound();
-    error Unauthorized();
-    error InvalidDestination();
-    error InsufficientShares();
-    error VaultExists();
-    error InvalidAsset();
-    error ActiveShares();
-    error Paused();
-    error PositionExists();
-    error DuplicateMessage();
-    error RateLimitExceeded();
-    error InsufficientAllowance();
-    error NotHandler();
+    // Access control errors
+    error NotOwner();
     error NotMinter();
     error NotBurner();
     error NotTokenPool();
     error NotPositionManager();
     error NotCCIPAdmin();
-    error ExceedsMaxSize();
+    error NotHandler();
+    error Unauthorized();
 
+    // Input validation errors
     error ZeroAddress(address addr);
     error ZeroBytes(bytes32 key);
     error ZeroNumber(uint256 num);
+    error ZeroChainId();
+    error InvalidAmount();
+    error InvalidChain();
+    error InvalidVault();
+    error InvalidDeposit();
+    error InvalidDestination();
+    error InvalidAsset();
 
-    function verifyNotZero(address addr) internal pure {
+    // State errors
+    error VaultNotActive();
+    error VaultActive();
+    error VaultExists();
+    error Paused();
+    error CCTPAlreadyCompleted();
+    error DepositExpired();
+    error PositionExists();
+    error PositionNotFound();
+    error ActiveShares();
+    error InsufficientShares();
+    error InsufficientAllowance();
+    error DuplicateMessage();
+    error ExceedsMaxSize();
+    error SuspiciousSharePriceChange();
+
+    // Validation functions
+    function verifyAddress(address addr) internal pure {
         if (addr == address(0)) {
             revert ZeroAddress(addr);
         }
     }
 
-    function verifyNotZero(bytes32 key) internal pure {
+    function verifyBytes32(bytes32 key) internal pure {
         if (key == bytes32(0)) {
             revert ZeroBytes(key);
         }
     }
 
-    function verifyNotZero(uint256 num) internal pure {
+    function verifyNumber(uint256 num) internal pure {
         if (num == 0) {
             revert ZeroNumber(num);
         }
+    }
+
+    function verifyChainId(uint32 chainId) internal pure {
+        if (chainId == 0) revert ZeroChainId();
     }
 }

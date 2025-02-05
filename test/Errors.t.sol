@@ -7,17 +7,17 @@ import "../src/libs/Errors.sol";
 contract ErrorsTest is Test {
     // Helper function to explicitly call the address version
     function verifyAddress(address addr) internal pure {
-        Errors.verifyNotZero(addr);
+        Errors.verifyAddress(addr);
     }
 
     // Helper function to explicitly call the bytes32 version
     function verifyBytes32(bytes32 key) internal pure {
-        Errors.verifyNotZero(key);
+        Errors.verifyBytes32(key);
     }
 
     // Helper function to explicitly call the uint256 version
     function verifyUint256(uint256 num) internal pure {
-        Errors.verifyNotZero(num);
+        Errors.verifyNumber(num);
     }
 
     function test_VerifyNotZeroAddress() public {

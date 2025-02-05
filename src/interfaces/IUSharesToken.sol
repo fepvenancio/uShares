@@ -14,11 +14,12 @@ interface IUSharesToken {
         address sourceVault;
         address targetVault;
         uint32 destinationChain;
-        uint256 expectedShares;
-        bool cctpCompleted;
-        bool sharesIssued;
+        uint256 vaultShares;      // actual shares received from vault
+        uint256 uSharesMinted;    // amount of uShares minted to user
+        bool cctpCompleted;       // CCTP transfer completed
+        bool sharesIssued;        // vault shares received
         uint256 timestamp;
-        uint256 minShares;
+        uint256 minShares;        // minimum shares user expects
         uint256 deadline;
     }
 
@@ -49,9 +50,25 @@ interface IUSharesToken {
         uint256 deadline
     );
 
-    event CCTPCompleted(bytes32 indexed depositId, uint256 usdcAmount, uint32 destinationChain);
+    event CCTPCompleted(
+        bytes32 indexed depositId, 
+        uint256 usdcAmount, 
+        uint32 destinationChain,
+        address targetVault
+    );
 
-    event SharesIssued(bytes32 indexed depositId, address indexed user, uint256 shares);
+    event VaultSharesReceived(
+        bytes32 indexed depositId,
+        address indexed vault,
+        uint256 vaultShares
+    );
+
+    event SharesIssued(
+        bytes32 indexed depositId, 
+        address indexed user, 
+        uint256 uSharesAmount,
+        uint256 vaultShares
+    );
 
     event VaultMapped(uint32 indexed chainId, address indexed localVault, address indexed remoteVault);
 
@@ -63,7 +80,6 @@ interface IUSharesToken {
     event MinterConfigured(address indexed minter, bool status);
     event BurnerConfigured(address indexed burner, bool status);
     event TokenPoolConfigured(address indexed pool, bool status);
-    event RateLimitUpdated(uint32 chainId, bool isOutbound, uint256 rate, uint256 capacity);
     event RemotePoolUpdated(uint32 chainId, address pool, bool allowed);
     event CCIPAdminUpdated(address oldAdmin, address newAdmin);
 

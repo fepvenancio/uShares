@@ -37,82 +37,79 @@ contract PositionManager is IPositionManager, Ownable {
     }
 
     constructor(address _vaultRegistry) {
-        Errors.verifyNotZero(_vaultRegistry);
+        Errors.verifyAddress(_vaultRegistry);
         vaultRegistry = IVaultRegistry(_vaultRegistry);
         _initializeOwner(msg.sender);
     }
 
     /**
      * @notice Create a new position for a user
-     * @param owner User address
+     * @param user User address
      * @param sourceChain Chain ID where user initiates deposit
      * @param destinationChain Chain ID where vault exists
-     * @param destinationVault Vault identifier
+     * @param vault Vault identifier
      * @param shares Initial share amount
      * @return positionKey Unique position identifier
      */
     function createPosition(
-        address owner,
+        address user,
         uint32 sourceChain,
         uint32 destinationChain,
-        address destinationVault,
+        address vault,
         uint256 shares
-    ) external returns (bytes32 positionKey) {
-        // Validate caller is handler
-        if (!handlers[msg.sender]) revert Errors.NotHandler();
-
+    ) external onlyHandler returns (bytes32 positionKey) {
         // Validate inputs
-        Errors.verifyNotZero(owner);
-        Errors.verifyNotZero(sourceChain);
-        Errors.verifyNotZero(destinationChain);
-        Errors.verifyNotZero(destinationVault);
+        Errors.verifyAddress(user);
+        Errors.verifyChainId(sourceChain);
+        Errors.verifyChainId(destinationChain);
+        Errors.verifyAddress(vault);
 
         // Validate vault is active
-        if (!vaultRegistry.isVaultActive(destinationChain, destinationVault)) {
+        if (!vaultRegistry.isVaultActive(destinationChain, vault)) {
             revert Errors.VaultNotActive();
         }
 
         // Generate position key
-        positionKey = KeyManager.getPositionKey(owner, sourceChain, destinationChain, destinationVault);
+        positionKey = KeyManager.getPositionKey(user, sourceChain, destinationChain, vault);
 
         // Check if position already exists
         if (positions[positionKey].active) revert Errors.PositionExists();
 
         // Store position
         positions[positionKey] = Position({
-            owner: owner,
+            owner: user,
             sourceChain: sourceChain,
             destinationChain: destinationChain,
-            destinationVault: destinationVault,
+            destinationVault: vault,
             shares: shares,
             active: true,
             timestamp: uint64(block.timestamp)
         });
 
         // Update tracking
-        userPositions[owner].push(positionKey);
+        userPositions[user].push(positionKey);
         chainPositions[sourceChain].push(positionKey);
 
-        emit PositionCreated(owner, sourceChain, destinationChain, destinationVault, shares);
+        emit PositionCreated(user, sourceChain, destinationChain, vault, shares);
     }
 
     /**
      * @notice Update shares for an existing position
      * @param positionKey Unique position identifier
-     * @param newShares New share amount
+     * @param shares New share amount
      */
-    function updatePosition(bytes32 positionKey, uint256 newShares) external onlyHandler {
-        // Validate input and position exists
-        Errors.verifyNotZero(positionKey);
+    function updatePosition(bytes32 positionKey, uint256 shares) external onlyHandler {
+        Errors.verifyBytes32(positionKey);
 
+        // Get position
         Position storage position = positions[positionKey];
         if (!position.active) revert Errors.PositionNotFound();
 
-        // Update position
-        position.shares = newShares;
+        // Update shares
+        position.shares = shares;
         position.timestamp = block.timestamp;
 
-        emit PositionUpdated(positionKey, newShares, block.timestamp);
+        emit PositionUpdated(positionKey, shares, block.timestamp);
     }
 
     /**
@@ -178,7 +175,7 @@ contract PositionManager is IPositionManager, Ownable {
     }
 
     function configureHandler(address handler, bool status) external onlyOwner {
-        Errors.verifyNotZero(handler);
+        Errors.verifyAddress(handler);
         handlers[handler] = status;
         emit HandlerConfigured(handler, status);
     }

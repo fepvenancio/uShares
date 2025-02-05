@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {Errors} from "./Errors.sol";
+
 /// @title KeyManager
 /// @notice Library for handling position and vault keys
 library KeyManager {
     // Error definitions
     error InvalidKeyLength();
     error InvalidAddress();
-    error InvalidChainId();
 
     /// @notice Creates a unique key for a position
     /// @param owner Position owner
@@ -21,8 +22,8 @@ library KeyManager {
         returns (bytes32)
     {
         if (owner == address(0)) revert InvalidAddress();
-        if (sourceChain == 0) revert InvalidChainId();
-        if (destinationChain == 0) revert InvalidChainId();
+        if (sourceChain == 0) revert Errors.ZeroChainId();
+        if (destinationChain == 0) revert Errors.ZeroChainId();
         if (destinationVault == address(0)) revert InvalidAddress();
 
         return keccak256(abi.encode(owner, sourceChain, destinationChain, destinationVault));
@@ -33,7 +34,7 @@ library KeyManager {
     /// @param vault Vault address
     /// @return bytes32 Unique vault identifier
     function getVaultKey(uint32 chainId, address vault) internal pure returns (bytes32) {
-        if (chainId == 0) revert InvalidChainId();
+        if (chainId == 0) revert Errors.ZeroChainId();
         if (vault == address(0)) revert InvalidAddress();
 
         return keccak256(abi.encode(chainId, vault));

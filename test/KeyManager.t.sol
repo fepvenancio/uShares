@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 import "../src/libs/KeyManager.sol";
+import "../src/libs/Errors.sol";
 
 contract KeyManagerTest is Test {
     address constant USER = address(0x123);
@@ -38,12 +39,12 @@ contract KeyManagerTest is Test {
     }
 
     function test_RevertGetPositionKey_ZeroChainId() public {
-        vm.expectRevert(KeyManager.InvalidChainId.selector);
+        vm.expectRevert(Errors.ZeroChainId.selector);
         KeyManager.getPositionKey(USER, 0, DEST_CHAIN, VAULT);
     }
 
     function test_RevertGetVaultKey_ZeroChainId() public {
-        vm.expectRevert(KeyManager.InvalidChainId.selector);
+        vm.expectRevert(Errors.ZeroChainId.selector);
         KeyManager.getVaultKey(0, VAULT);
     }
 

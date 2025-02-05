@@ -10,6 +10,8 @@ interface IVaultRegistry {
 
     function removeVault(uint32 chainId, address vault) external;
 
+    function updateVaultShares(uint32 chainId, address vault, uint96 newTotalShares) external;
+
     function getVaultInfo(uint32 chainId, address vault) external view returns (DataTypes.VaultInfo memory);
 
     function isVaultActive(uint32 chainId, address vault) external view returns (bool);

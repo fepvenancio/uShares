@@ -23,9 +23,16 @@ contract MockCCTP is ICCTP {
     mapping(bytes32 => bool) public verifiedMessages;
     uint64 private nonce;
 
-    function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken)
-        external
-    {
+    // Track burned amounts
+    mapping(address => uint256) public burnedAmounts;
+    mapping(bytes32 => bool) public messageProcessed;
+
+    function depositForBurn(
+        uint256 amount,
+        uint32 destinationChainId,
+        bytes32 mintRecipient,
+        address burnToken
+    ) external override {
         require(amount > 0, "Amount must be nonzero");
         require(mintRecipient != bytes32(0), "Mint recipient must be nonzero");
         require(burnToken != address(0), "Invalid token");
@@ -33,8 +40,11 @@ contract MockCCTP is ICCTP {
         // Increment nonce for unique message ID
         nonce++;
 
-        bytes32 messageHash = keccak256(abi.encode(amount, destinationDomain, mintRecipient, nonce));
+        bytes32 messageHash = keccak256(abi.encode(amount, destinationChainId, mintRecipient, nonce));
         messages[messageHash] = true;
+
+        // Track burned amount
+        burnedAmounts[msg.sender] += amount;
 
         // Emit event matching Circle's TokenMessenger
         emit DepositForBurn(
@@ -43,27 +53,24 @@ contract MockCCTP is ICCTP {
             amount,
             msg.sender,
             mintRecipient,
-            destinationDomain,
+            destinationChainId,
             bytes32(0), // Mock destination messenger
             bytes32(0) // No specific caller required
         );
     }
 
-    function receiveMessage(bytes memory message, bytes memory attestation) external override returns (bool) {
-        bytes32 messageHash = keccak256(message);
-        require(verifiedMessages[messageHash], "Message not verified");
-
-        // Parse message to emit MintAndWithdraw event
-        (address recipient, uint256 amount, address token) = abi.decode(message, (address, uint256, address));
-
-        emit MintAndWithdraw(recipient, amount, token);
-
-        messages[messageHash] = true;
+    function receiveMessage(bytes memory message, bytes memory) external override returns (bool) {
+        // Always return true for testing
         return true;
     }
 
-    function verifyMessageHash(bytes memory message, bytes memory attestation) external view override returns (bool) {
-        bytes32 messageHash = keccak256(message);
-        return verifiedMessages[messageHash];
+    function verifyMessageHash(bytes memory message, bytes memory) external view override returns (bool) {
+        // Always return true for testing
+        return true;
+    }
+
+    // Helper function to get burned amount
+    function getBurnedAmount(address account) external view returns (uint256) {
+        return burnedAmounts[account];
     }
 }

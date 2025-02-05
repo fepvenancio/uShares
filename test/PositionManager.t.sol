@@ -138,14 +138,14 @@ contract PositionManagerTest is BaseTest {
 
     function test_RevertCreatePosition_ZeroSourceChain() public {
         vm.startPrank(handler);
-        vm.expectRevert(abi.encodeWithSelector(Errors.ZeroNumber.selector, 0));
+        vm.expectRevert(Errors.ZeroChainId.selector);
         positions.createPosition(user1, 0, DEST_CHAIN, address(vault), 1000e6);
         vm.stopPrank();
     }
 
     function test_RevertCreatePosition_ZeroDestChain() public {
         vm.startPrank(handler);
-        vm.expectRevert(abi.encodeWithSelector(Errors.ZeroNumber.selector, 0));
+        vm.expectRevert(Errors.ZeroChainId.selector);
         positions.createPosition(user1, SOURCE_CHAIN, 0, address(vault), 1000e6);
         vm.stopPrank();
     }
