@@ -13,33 +13,58 @@ import {Errors} from "./libs/Errors.sol";
  * @title PositionManager
  * @notice Manages user positions across different chains and vaults
  * @dev Tracks and manages user positions in cross-chain vaults
+ * @custom:security-contact security@ushares.com
  */
 contract PositionManager is IPositionManager, OwnableRoles {
     using SafeTransferLib for ERC20;
     using KeyManager for *;
 
-    // Roles
+    /*//////////////////////////////////////////////////////////////
+                                CONSTANTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Role identifier for admin operations
     uint256 public constant ADMIN_ROLE = _ROLE_0;
+    
+    /// @notice Role identifier for handler operations (creating/updating positions)
     uint256 public constant HANDLER_ROLE = _ROLE_1;
 
-    // State variables
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Reference to the vault registry contract
     IVaultRegistry public immutable vaultRegistry;
+    
+    /// @notice Mapping of addresses to their handler status
     mapping(address => bool) public handlers;
 
-    // Position storage - userKey (source) => vaultId => Position
+    /// @notice Mapping of position keys to Position structs
+    /// @dev Key format: keccak256(abi.encode(owner, sourceChain, destinationChain, destinationVault))
     mapping(bytes32 => Position) public positions;
 
-    // User tracking - address => positionKeys[]
+    /// @notice Mapping of user addresses to their position keys
     mapping(address => bytes32[]) public userPositions;
 
-    // Chain tracking - sourceChain => positionKeys[]
+    /// @notice Mapping of source chain IDs to position keys originating from that chain
     mapping(uint32 => bytes32[]) public chainPositions;
 
+    /*//////////////////////////////////////////////////////////////
+                                MODIFIERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Ensures caller has the HANDLER_ROLE
     modifier onlyHandler() {
         if (!hasAnyRole(msg.sender, HANDLER_ROLE)) revert Errors.NotHandler();
         _;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Initializes the PositionManager contract
+    /// @param _vaultRegistry Address of the vault registry contract
     constructor(address _vaultRegistry) {
         Errors.verifyAddress(_vaultRegistry);
         vaultRegistry = IVaultRegistry(_vaultRegistry);
@@ -47,9 +72,14 @@ contract PositionManager is IPositionManager, OwnableRoles {
         _grantRoles(msg.sender, ADMIN_ROLE | HANDLER_ROLE);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            POSITION MANAGEMENT
+    //////////////////////////////////////////////////////////////*/
+
     /**
-     * @notice Create a new position for a user
-     * @param user User address
+     * @notice Creates a new position for a user
+     * @dev Validates inputs and vault status before creating position
+     * @param user User address who owns the position
      * @param sourceChain Chain ID where user initiates deposit
      * @param destinationChain Chain ID where vault exists
      * @param vault Vault identifier
@@ -99,7 +129,8 @@ contract PositionManager is IPositionManager, OwnableRoles {
     }
 
     /**
-     * @notice Update shares for an existing position
+     * @notice Updates shares for an existing position
+     * @dev Only active positions can be updated
      * @param positionKey Unique position identifier
      * @param shares New share amount
      */
@@ -118,7 +149,8 @@ contract PositionManager is IPositionManager, OwnableRoles {
     }
 
     /**
-     * @notice Close an existing position
+     * @notice Closes an existing position
+     * @dev Sets position to inactive and zeros out shares
      * @param positionKey Unique position identifier
      */
     function closePosition(bytes32 positionKey) external onlyHandler {
@@ -134,8 +166,12 @@ contract PositionManager is IPositionManager, OwnableRoles {
         emit PositionClosed(positionKey);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            VIEW FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
     /**
-     * @notice Get all position keys for a user
+     * @notice Gets all position keys for a user
      * @param user User address
      * @return Array of position keys
      */
@@ -144,7 +180,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
     }
 
     /**
-     * @notice Get all position keys for a source chain
+     * @notice Gets all position keys for a source chain
      * @param sourceChain Source chain ID
      * @return Array of position keys
      */
@@ -153,7 +189,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
     }
 
     /**
-     * @notice Check if a position exists and is active
+     * @notice Checks if a position exists and is active
      * @param positionKey Position identifier
      * @return bool Position status
      */
@@ -162,7 +198,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
     }
 
     /**
-     * @notice Get total positions for a user
+     * @notice Gets total positions for a user
      * @param user User address
      * @return uint256 Number of positions
      */
@@ -171,7 +207,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
     }
 
     /**
-     * @notice Get total positions for a chain
+     * @notice Gets total positions for a chain
      * @param sourceChain Chain ID
      * @return uint256 Number of positions
      */
@@ -179,19 +215,44 @@ contract PositionManager is IPositionManager, OwnableRoles {
         return chainPositions[sourceChain].length;
     }
 
-    // Role management functions
+    /*//////////////////////////////////////////////////////////////
+                            ROLE MANAGEMENT
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Grants roles to a user
+     * @dev Only callable by admin
+     * @param user Address to grant roles to
+     * @param roles Roles to grant
+     */
     function grantRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
         _grantRoles(user, roles);
     }
 
+    /**
+     * @notice Revokes roles from a user
+     * @dev Only callable by admin
+     * @param user Address to revoke roles from
+     * @param roles Roles to revoke
+     */
     function revokeRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
         _removeRoles(user, roles);
     }
 
+    /**
+     * @notice Allows a user to renounce their own roles
+     * @param roles Roles to renounce
+     */
     function renounceRoles(uint256 roles) public payable virtual override {
         _removeRoles(msg.sender, roles);
     }
 
+    /**
+     * @notice Configures handler status for an address
+     * @dev Only callable by admin
+     * @param handler Address to configure
+     * @param status Handler status to set
+     */
     function configureHandler(address handler, bool status) external onlyRoles(ADMIN_ROLE) {
         Errors.verifyAddress(handler);
         if (status) {
@@ -203,10 +264,20 @@ contract PositionManager is IPositionManager, OwnableRoles {
         emit HandlerConfigured(handler, status);
     }
 
+    /**
+     * @notice Checks if an address is a handler
+     * @param handler Address to check
+     * @return bool Handler status
+     */
     function isHandler(address handler) external view returns (bool) {
         return hasAnyRole(handler, HANDLER_ROLE);
     }
 
+    /**
+     * @notice Gets position details
+     * @param positionKey Position identifier
+     * @return Position struct containing position details
+     */
     function getPosition(bytes32 positionKey) external view returns (Position memory) {
         Position memory pos = positions[positionKey];
         return Position({
@@ -220,6 +291,14 @@ contract PositionManager is IPositionManager, OwnableRoles {
         });
     }
 
+    /**
+     * @notice Generates a position key from components
+     * @param owner Position owner address
+     * @param sourceChain Source chain ID
+     * @param destinationChain Destination chain ID
+     * @param destinationVault Destination vault address
+     * @return bytes32 Generated position key
+     */
     function getPositionKey(address owner, uint32 sourceChain, uint32 destinationChain, address destinationVault)
         external
         pure
