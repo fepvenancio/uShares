@@ -5,6 +5,7 @@ import "./base/BaseTest.t.sol";
 import {Errors} from "../src/libs/Errors.sol";
 import {KeyManager} from "../src/libs/KeyManager.sol";
 import {IPositionManager} from "../src/interfaces/IPositionManager.sol";
+import {DataTypes} from "../src/types/DataTypes.sol";
 
 contract PositionManagerTest is BaseTest {
     event PositionCreated(
@@ -33,7 +34,7 @@ contract PositionManagerTest is BaseTest {
         bytes32 positionKey = positions.createPosition(user1, SOURCE_CHAIN, DEST_CHAIN, address(vault), shares);
 
         // Get position directly from mapping
-        IPositionManager.Position memory pos = positions.getPosition(positionKey);
+        DataTypes.Position memory pos = positions.getPosition(positionKey);
 
         // Verify position
         assertEq(pos.owner, user1);
@@ -61,7 +62,7 @@ contract PositionManagerTest is BaseTest {
         positions.updatePosition(positionKey, newShares);
 
         // Verify update
-        IPositionManager.Position memory pos = positions.getPosition(positionKey);
+        DataTypes.Position memory pos = positions.getPosition(positionKey);
         assertEq(pos.shares, newShares);
 
         vm.stopPrank();
@@ -80,7 +81,7 @@ contract PositionManagerTest is BaseTest {
         positions.closePosition(positionKey);
 
         // Verify closure
-        IPositionManager.Position memory pos = positions.getPosition(positionKey);
+        DataTypes.Position memory pos = positions.getPosition(positionKey);
         assertFalse(pos.active);
         assertFalse(positions.isPositionActive(positionKey));
 
@@ -120,8 +121,8 @@ contract PositionManagerTest is BaseTest {
         bytes32 key1 = KeyManager.getPositionKey(user1, SOURCE_CHAIN, DEST_CHAIN, address(vault));
         bytes32 key2 = KeyManager.getPositionKey(user2, SOURCE_CHAIN, DEST_CHAIN, address(vault));
 
-        IPositionManager.Position memory pos1 = positions.getPosition(key1);
-        IPositionManager.Position memory pos2 = positions.getPosition(key2);
+        DataTypes.Position memory pos1 = positions.getPosition(key1);
+        DataTypes.Position memory pos2 = positions.getPosition(key2);
 
         assertEq(pos1.shares, amount1);
         assertEq(pos2.shares, amount2);

@@ -8,6 +8,7 @@ import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
 import {IPositionManager} from "./interfaces/IPositionManager.sol";
 import {KeyManager} from "./libs/KeyManager.sol";
 import {Errors} from "./libs/Errors.sol";
+import {DataTypes} from "./types/DataTypes.sol";
 
 /**
  * @title PositionManager
@@ -41,7 +42,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
 
     /// @notice Mapping of position keys to Position structs
     /// @dev Key format: keccak256(abi.encode(owner, sourceChain, destinationChain, destinationVault))
-    mapping(bytes32 => Position) public positions;
+    mapping(bytes32 => DataTypes.Position) public positions;
 
     /// @notice Mapping of user addresses to their position keys
     mapping(address => bytes32[]) public userPositions;
@@ -111,7 +112,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
         if (positions[positionKey].active) revert Errors.PositionExists();
 
         // Store position
-        positions[positionKey] = Position({
+        positions[positionKey] = DataTypes.Position({
             owner: user,
             sourceChain: sourceChain,
             destinationChain: destinationChain,
@@ -138,7 +139,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
         Errors.verifyBytes32(positionKey);
 
         // Get position
-        Position storage position = positions[positionKey];
+        DataTypes.Position storage position = positions[positionKey];
         if (!position.active) revert Errors.PositionNotFound();
 
         // Update shares
@@ -155,7 +156,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
      */
     function closePosition(bytes32 positionKey) external onlyHandler {
         // Validate position exists
-        Position storage position = positions[positionKey];
+        DataTypes.Position storage position = positions[positionKey];
         if (!position.active) revert Errors.PositionNotFound();
 
         // Deactivate position
@@ -278,9 +279,9 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @param positionKey Position identifier
      * @return Position struct containing position details
      */
-    function getPosition(bytes32 positionKey) external view returns (Position memory) {
-        Position memory pos = positions[positionKey];
-        return Position({
+    function getPosition(bytes32 positionKey) external view returns (DataTypes.Position memory) {
+        DataTypes.Position memory pos = positions[positionKey];
+        return DataTypes.Position({
             owner: pos.owner,
             sourceChain: pos.sourceChain,
             destinationChain: pos.destinationChain,

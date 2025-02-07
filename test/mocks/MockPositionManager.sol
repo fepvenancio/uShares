@@ -2,9 +2,10 @@
 pragma solidity 0.8.28;
 
 import {IPositionManager} from "../../src/interfaces/IPositionManager.sol";
+import {DataTypes} from "../../src/types/DataTypes.sol";
 
 contract MockPositionManager is IPositionManager {
-    mapping(bytes32 => Position) public positions;
+    mapping(bytes32 => DataTypes.Position) public positions;
     mapping(address => bool) public handlers;
 
     function configureHandler(address handler, bool status) external {
@@ -23,7 +24,7 @@ contract MockPositionManager is IPositionManager {
         uint256 shares
     ) external returns (bytes32 positionKey) {
         positionKey = getPositionKey(owner, sourceChain, destinationChain, destinationVault);
-        positions[positionKey] = Position({
+        positions[positionKey] = DataTypes.Position({
             owner: owner,
             sourceChain: sourceChain,
             destinationChain: destinationChain,
@@ -43,7 +44,7 @@ contract MockPositionManager is IPositionManager {
         positions[positionKey].active = false;
     }
 
-    function getPosition(bytes32 positionKey) external view returns (Position memory) {
+    function getPosition(bytes32 positionKey) external view returns (DataTypes.Position memory) {
         return positions[positionKey];
     }
 
@@ -73,6 +74,6 @@ contract MockPositionManager is IPositionManager {
         uint32 destinationChain,
         address destinationVault
     ) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(owner, sourceChain, destinationChain, destinationVault));
+        return keccak256(abi.encode(owner, sourceChain, destinationChain, destinationVault));
     }
 } 

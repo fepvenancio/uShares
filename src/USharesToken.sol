@@ -95,10 +95,10 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
     mapping(uint32 => mapping(address => address)) public chainToVaultMapping;
     
     /// @notice Mapping of deposit ID to cross-chain deposit details
-    mapping(bytes32 => CrossChainDeposit) public deposits;
+    mapping(bytes32 => DataTypes.CrossChainDeposit) public deposits;
     
     /// @notice Mapping of withdrawal ID to cross-chain withdrawal details
-    mapping(bytes32 => CrossChainWithdrawal) public withdrawals;
+    mapping(bytes32 => DataTypes.CrossChainWithdrawal) public withdrawals;
     
     /// @notice Mapping to track processed CCTP messages
     mapping(bytes32 => bool) public processedMessages;
@@ -375,12 +375,8 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
      * @dev Implements CCT standard for token locking/burning
      * @param params Parameters for the lock/burn operation
      * @return message Encoded message for cross-chain communication
-     * @custom:requirements
-     * - Caller must have TOKEN_POOL_ROLE
-     * - Amount must not exceed MAX_TRANSACTION_SIZE
-     * - Target vault must be registered and active
      */
-    function lockOrBurn(LockOrBurnParams calldata params) external returns (bytes memory message) {
+    function lockOrBurn(DataTypes.LockOrBurnParams calldata params) external returns (bytes memory message) {
         if (!hasAnyRole(msg.sender, TOKEN_POOL_ROLE)) revert Errors.NotTokenPool();
         Errors.verifyAddress(params.receiver);
         Errors.verifyNumber(params.amount);
@@ -432,13 +428,8 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
      * @dev Implements CCT standard for token release/minting
      * @param params Parameters for the release/mint operation
      * @return uint256 Amount of tokens released/minted
-     * @custom:requirements
-     * - Caller must have TOKEN_POOL_ROLE
-     * - Amount must not exceed MAX_TRANSACTION_SIZE
-     * - Source vault must be registered and active
-     * - Message must not be previously processed
      */
-    function releaseOrMint(ReleaseOrMintParams calldata params) external returns (uint256) {
+    function releaseOrMint(DataTypes.ReleaseOrMintParams calldata params) external returns (uint256) {
         if (!hasAnyRole(msg.sender, TOKEN_POOL_ROLE)) revert Errors.NotTokenPool();
         Errors.verifyAddress(params.receiver);
         Errors.verifyNumber(params.amount);
@@ -536,7 +527,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
         );
 
         // Create deposit record
-        deposits[depositId] = CrossChainDeposit({
+        deposits[depositId] = DataTypes.CrossChainDeposit({
             user: msg.sender,
             usdcAmount: usdcAmount,
             sourceVault: targetVault,
@@ -584,7 +575,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
      * - Vault shares must meet minimum requirement
      */
     function mintSharesFromDeposit(bytes32 depositId, uint256 vaultShares) external {
-        CrossChainDeposit storage deposit = deposits[depositId];
+        DataTypes.CrossChainDeposit storage deposit = deposits[depositId];
         if (!deposit.cctpCompleted) revert Errors.CCTPAlreadyCompleted();
         if (deposit.sharesIssued) revert Errors.ActiveShares();
         if (block.timestamp > deposit.deadline) revert Errors.DepositExpired();
@@ -635,7 +626,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
      * - Message must not be previously processed
      */
     function processCCTPCompletion(bytes32 depositId, bytes calldata attestation) external {
-        CrossChainDeposit storage deposit = deposits[depositId];
+        DataTypes.CrossChainDeposit storage deposit = deposits[depositId];
         if (deposit.user == address(0)) revert Errors.InvalidDeposit();
         if (deposit.cctpCompleted) revert Errors.CCTPAlreadyCompleted();
         if (block.timestamp > deposit.deadline) revert Errors.DepositExpired();
@@ -718,7 +709,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
         );
 
         // Create withdrawal record
-        withdrawals[withdrawalId] = CrossChainWithdrawal({
+        withdrawals[withdrawalId] = DataTypes.CrossChainWithdrawal({
             user: msg.sender,
             uSharesAmount: uSharesAmount,
             sourceVault: targetVault,
@@ -773,7 +764,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
      * - USDC amount must meet minimum requirement
      */
     function processWithdrawalCompletion(bytes32 withdrawalId, bytes calldata attestation) external {
-        CrossChainWithdrawal storage withdrawal = withdrawals[withdrawalId];
+        DataTypes.CrossChainWithdrawal storage withdrawal = withdrawals[withdrawalId];
         if (withdrawal.user == address(0)) revert Errors.InvalidWithdrawal();
         if (withdrawal.cctpCompleted) revert Errors.CCTPAlreadyCompleted();
         if (block.timestamp > withdrawal.deadline) revert Errors.WithdrawalExpired();
@@ -817,7 +808,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
      * - Shares must not be already withdrawn
      */
     function recoverStaleWithdrawal(bytes32 withdrawalId) external {
-        CrossChainWithdrawal storage withdrawal = withdrawals[withdrawalId];
+        DataTypes.CrossChainWithdrawal storage withdrawal = withdrawals[withdrawalId];
         if (withdrawal.user == address(0)) revert Errors.InvalidWithdrawal();
         if (block.timestamp <= withdrawal.timestamp + PROCESS_TIMEOUT) revert Errors.InvalidWithdrawal();
         if (withdrawal.sharesWithdrawn) revert Errors.WithdrawalProcessed();
@@ -842,7 +833,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
      * - Shares must not be already issued
      */
     function recoverStaleDeposit(bytes32 depositId) external {
-        CrossChainDeposit storage deposit = deposits[depositId];
+        DataTypes.CrossChainDeposit storage deposit = deposits[depositId];
         if (deposit.user == address(0)) revert Errors.InvalidDeposit();
         if (block.timestamp <= deposit.timestamp + PROCESS_TIMEOUT) revert Errors.InvalidDeposit();
         if (deposit.sharesIssued) revert Errors.ActiveShares();
@@ -917,7 +908,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
      * @param depositId Unique identifier for the deposit
      * @return CrossChainDeposit Deposit details
      */
-    function getDeposit(bytes32 depositId) external view returns (CrossChainDeposit memory) {
+    function getDeposit(bytes32 depositId) external view returns (DataTypes.CrossChainDeposit memory) {
         return deposits[depositId];
     }
 
@@ -926,7 +917,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
      * @param withdrawalId Unique identifier for the withdrawal
      * @return CrossChainWithdrawal Withdrawal details
      */
-    function getWithdrawal(bytes32 withdrawalId) external view returns (CrossChainWithdrawal memory) {
+    function getWithdrawal(bytes32 withdrawalId) external view returns (DataTypes.CrossChainWithdrawal memory) {
         return withdrawals[withdrawalId];
     }
 

@@ -4,17 +4,7 @@ pragma solidity 0.8.28;
 import {DataTypes} from "../types/DataTypes.sol";
 
 interface IPositionManager {
-    struct Position {
-        address owner;
-        uint32 sourceChain;
-        uint32 destinationChain;
-        address destinationVault;
-        uint256 shares;
-        bool active;
-        uint256 timestamp;
-    }
     // Events
-
     event PositionCreated(
         address indexed user,
         uint32 indexed sourceChain,
@@ -46,7 +36,7 @@ interface IPositionManager {
 
     function closePosition(bytes32 positionKey) external;
 
-    function getPosition(bytes32 positionKey) external view returns (Position memory);
+    function getPosition(bytes32 positionKey) external view returns (DataTypes.Position memory);
 
     function getUserPositions(address user) external view returns (bytes32[] memory);
 

@@ -1,58 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {DataTypes} from "../types/DataTypes.sol";
+
 /**
  * @title IUSharesToken
  * @notice Interface for uShares cross-chain token standard
  * @dev Based on Chainlink's CCT (Cross-Chain Token) standard
  */
 interface IUSharesToken {
-    // Structs
-    struct CrossChainDeposit {
-        address user;
-        uint256 usdcAmount;
-        address sourceVault;
-        address targetVault;
-        uint32 destinationChain;
-        uint256 vaultShares;      // actual shares received from vault
-        uint256 uSharesMinted;    // amount of uShares minted to user
-        bool cctpCompleted;       // CCTP transfer completed
-        bool sharesIssued;        // vault shares received
-        uint256 timestamp;
-        uint256 minShares;        // minimum shares user expects
-        uint256 deadline;
-    }
-
-    struct CrossChainWithdrawal {
-        address user;
-        uint256 uSharesAmount;
-        address sourceVault;
-        address targetVault;
-        uint32 destinationChain;
-        uint256 usdcAmount;
-        bool cctpCompleted;
-        bool sharesWithdrawn;
-        uint256 timestamp;
-        uint256 minUSDC;
-        uint256 deadline;
-    }
-
-    // CCT Standard structs
-    struct LockOrBurnInV1 {
-        address sender;
-        uint256 amount;
-        uint64 destinationChainSelector;
-        address receiver;
-        bytes32 depositId;
-    }
-
-    struct ReleaseOrMintInV1 {
-        bytes32 depositId;
-        address receiver;
-        uint256 amount;
-        uint64 sourceChainSelector;
-    }
-
     // Events
     event DepositInitiated(
         bytes32 indexed depositId,
@@ -150,8 +106,8 @@ interface IUSharesToken {
     function configureTokenPool(address pool, bool status) external;
 
     // View functions
-    function getDeposit(bytes32 depositId) external view returns (CrossChainDeposit memory);
-    function getWithdrawal(bytes32 withdrawalId) external view returns (CrossChainWithdrawal memory);
+    function getDeposit(bytes32 depositId) external view returns (DataTypes.CrossChainDeposit memory);
+    function getWithdrawal(bytes32 withdrawalId) external view returns (DataTypes.CrossChainWithdrawal memory);
     function getVaultMapping(uint32 chainId, address localVault) external view returns (address);
     function getCCTPContract() external view returns (address);
     function getChainId() external view returns (uint32);

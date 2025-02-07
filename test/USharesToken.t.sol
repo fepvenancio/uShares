@@ -8,13 +8,16 @@ import {ICCTToken} from "../src/interfaces/ICCTToken.sol";
 import {ICCTP} from "../src/interfaces/ICCTP.sol";
 import {IVault} from "../src/interfaces/IVault.sol";
 import {IRouter} from "../src/interfaces/IRouter.sol";
+import {PositionManager} from "../src/PositionManager.sol";
+import {MockRouter} from "./mocks/MockRouter.sol";
+import {MockCCTP} from "./mocks/MockCCTP.sol";
+import {MockUSDC} from "./mocks/MockUSDC.sol";
+import {MockVaultRegistry} from "./mocks/MockVaultRegistry.sol";
+import {MockPositionManager} from "./mocks/MockPositionManager.sol";
 import {DataTypes} from "../src/types/DataTypes.sol";
 import {Errors} from "../src/libs/Errors.sol";
 import {ERC20} from "solady/tokens/ERC20.sol";
-import {MockCCTP} from "./mocks/MockCCTP.sol";
-import {MockRouter} from "./mocks/MockRouter.sol";
 import {VaultRegistry} from "../src/VaultRegistry.sol";
-import {PositionManager} from "../src/PositionManager.sol";
 import {TestVault} from "./mocks/TestVault.sol";
 
 contract USharesTokenTest is Test {
@@ -157,7 +160,7 @@ contract USharesTokenTest is Test {
         baseToken.processCCTPCompletion(depositId, attestation);
 
         // Verify deposit completed
-        IUSharesToken.CrossChainDeposit memory deposit = baseToken.getDeposit(depositId);
+        DataTypes.CrossChainDeposit memory deposit = baseToken.getDeposit(depositId);
         assertTrue(deposit.cctpCompleted);
         assertTrue(deposit.sharesIssued);
         assertEq(deposit.vaultShares, VALID_AMOUNT);
@@ -270,10 +273,78 @@ contract USharesTokenTest is Test {
         baseToken.recoverStaleDeposit(depositId);
 
         // Verify deposit was deleted
-        IUSharesToken.CrossChainDeposit memory deposit = baseToken.getDeposit(depositId);
+        DataTypes.CrossChainDeposit memory deposit = baseToken.getDeposit(depositId);
         assertEq(deposit.user, address(0));
         assertEq(deposit.usdcAmount, 0);
 
+        vm.stopPrank();
+    }
+
+    // Helper functions
+    function _initiateDeposit() internal returns (bytes32) {
+        uint256 deadline = block.timestamp + 1 hours;
+        return baseToken.initiateDeposit(
+            address(baseVault),
+            VALID_AMOUNT,
+            uint64(OPTIMISM_CHAIN_ID),
+            MIN_SHARES,
+            deadline
+        );
+    }
+
+    function _initiateWithdrawal() internal returns (bytes32) {
+        uint256 deadline = block.timestamp + 1 hours;
+        return baseToken.initiateWithdrawal(
+            VALID_AMOUNT,
+            address(baseVault),
+            MIN_USDC,
+            deadline
+        );
+    }
+
+    function test_GetDeposit() public {
+        vm.startPrank(user);
+        bytes32 depositId = _initiateDeposit();
+        DataTypes.CrossChainDeposit memory deposit = baseToken.getDeposit(depositId);
+        
+        assertEq(deposit.user, user);
+        assertEq(deposit.usdcAmount, VALID_AMOUNT);
+        assertEq(deposit.sourceVault, address(baseVault));
+        assertEq(deposit.destinationChain, OPTIMISM_CHAIN_ID);
+        assertEq(deposit.vaultShares, 0);
+        assertEq(deposit.uSharesMinted, 0);
+        assertFalse(deposit.cctpCompleted);
+        assertFalse(deposit.sharesIssued);
+        vm.stopPrank();
+    }
+
+    function test_GetWithdrawal() public {
+        vm.startPrank(user);
+
+        // First complete a deposit to get some tokens
+        bytes32 depositId = _initiateDeposit();
+        
+        // Mock CCTP completion
+        bytes memory attestation = abi.encode(
+            BASE_DOMAIN,
+            bytes32(uint256(uint160(address(baseToken)))),
+            abi.encode(VALID_AMOUNT)  // Include USDC amount in message
+        );
+
+        // Process CCTP completion
+        baseToken.processCCTPCompletion(depositId, attestation);
+
+        // Now initiate withdrawal
+        bytes32 withdrawalId = _initiateWithdrawal();
+        DataTypes.CrossChainWithdrawal memory withdrawal = baseToken.getWithdrawal(withdrawalId);
+        
+        assertEq(withdrawal.user, user);
+        assertEq(withdrawal.uSharesAmount, VALID_AMOUNT);
+        assertEq(withdrawal.sourceVault, address(baseVault));
+        assertEq(withdrawal.destinationChain, OPTIMISM_CHAIN_ID);
+        assertEq(withdrawal.usdcAmount, 0);
+        assertFalse(withdrawal.cctpCompleted);
+        assertFalse(withdrawal.sharesWithdrawn);
         vm.stopPrank();
     }
 }
