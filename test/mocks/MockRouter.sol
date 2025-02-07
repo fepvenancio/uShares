@@ -4,20 +4,28 @@ pragma solidity 0.8.28;
 import {IRouter} from "../../src/interfaces/IRouter.sol";
 
 contract MockRouter is IRouter {
-    mapping(bytes32 => bool) public sentMessages;
+    mapping(address => address) public tokenPools;
 
-    error InvalidAddress();
-
-    function ccipSend(uint64 destinationChainSelector, bytes memory message) external returns (bytes32) {
-        // Validate inputs
-        if (msg.sender == address(0)) revert InvalidAddress();
-
-        bytes32 messageId = keccak256(abi.encode(destinationChainSelector, message));
-        sentMessages[messageId] = true;
-        return messageId;
+    function setTokenPool(address token, address pool) external {
+        tokenPools[token] = pool;
     }
 
-    function getSentMessage(bytes32 messageId) external view returns (bool) {
-        return sentMessages[messageId];
+    function getTokenPool(address token) external view returns (address) {
+        return tokenPools[token];
+    }
+
+    function isTokenPoolEnabled(address token) external view returns (bool) {
+        return tokenPools[token] != address(0);
+    }
+
+    function ccipSend(uint64 destinationChainSelector, bytes memory message) external override returns (bytes32) {
+        return bytes32(uint256(1)); // Return a dummy message ID
+    }
+
+    function ccipReceive(
+        bytes32 messageId,
+        bytes memory message
+    ) external {
+        // Do nothing for testing
     }
 }

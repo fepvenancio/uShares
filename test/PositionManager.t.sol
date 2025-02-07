@@ -97,7 +97,7 @@ contract PositionManagerTest is BaseTest {
         vm.startPrank(handler);
 
         // Try to create position with unregistered vault
-        address unregisteredVault = address(new MockVault(usdc));
+        address unregisteredVault = address(new MockVault(address(usdc)));
 
         vm.expectRevert(Errors.VaultNotActive.selector);
         positions.createPosition(user1, SOURCE_CHAIN, DEST_CHAIN, unregisteredVault, 1000e6);

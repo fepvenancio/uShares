@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Ownable} from "solady/auth/Ownable.sol";
+import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {ERC20} from "solady/tokens/ERC20.sol";
 import {ERC4626} from "solady/tokens/ERC4626.sol";
@@ -14,9 +14,14 @@ import {Errors} from "./libs/Errors.sol";
  * @title VaultRegistry
  * @notice Manages the registration and validation of ERC4626 vaults across different chains
  */
-contract VaultRegistry is IVaultRegistry, Ownable {
+contract VaultRegistry is IVaultRegistry, OwnableRoles {
     using SafeTransferLib for ERC20;
     using KeyManager for *;
+
+    // Roles
+    uint256 public constant ADMIN_ROLE = _ROLE_0;
+    uint256 public constant HANDLER_ROLE = _ROLE_1;
+    uint256 public constant PAUSER_ROLE = _ROLE_2;
 
     // State variables
     address public immutable usdc;
@@ -47,9 +52,10 @@ contract VaultRegistry is IVaultRegistry, Ownable {
         Errors.verifyAddress(_usdc);
         usdc = _usdc;
         _initializeOwner(msg.sender);
+        _grantRoles(msg.sender, ADMIN_ROLE | HANDLER_ROLE | PAUSER_ROLE);
     }
 
-    function registerVault(uint32 chainId, address vault) external override onlyOwner whenNotPaused {
+    function registerVault(uint32 chainId, address vault) external override onlyRoles(ADMIN_ROLE) whenNotPaused {
         Errors.verifyChainId(chainId);
         Errors.verifyAddress(vault);
 
@@ -83,7 +89,7 @@ contract VaultRegistry is IVaultRegistry, Ownable {
         emit VaultRegistered(chainId, vault, true);
     }
 
-    function updateVaultStatus(uint32 chainId, address vault, bool active) external override onlyOwner whenNotPaused {
+    function updateVaultStatus(uint32 chainId, address vault, bool active) external override onlyRoles(ADMIN_ROLE) whenNotPaused {
         bytes32 vaultKey = KeyManager.getVaultKey(chainId, vault);
         DataTypes.VaultInfo storage vaultInfo = vaults[vaultKey];
         Errors.verifyAddress(vaultInfo.vaultAddress);
@@ -92,7 +98,7 @@ contract VaultRegistry is IVaultRegistry, Ownable {
         emit VaultUpdated(chainId, vault, active);
     }
 
-    function removeVault(uint32 chainId, address vault) external override onlyOwner whenNotPaused {
+    function removeVault(uint32 chainId, address vault) external override onlyRoles(ADMIN_ROLE) whenNotPaused {
         bytes32 vaultKey = KeyManager.getVaultKey(chainId, vault);
         DataTypes.VaultInfo memory vaultInfo = vaults[vaultKey];
 
@@ -103,29 +109,7 @@ contract VaultRegistry is IVaultRegistry, Ownable {
         emit VaultRemoved(chainId, vault);
     }
 
-    function getVaultInfo(uint32 chainId, address vault) external view override returns (DataTypes.VaultInfo memory) {
-        return vaults[KeyManager.getVaultKey(chainId, vault)];
-    }
-
-    function isVaultActive(uint32 chainId, address vault) external view override returns (bool) {
-        return vaults[KeyManager.getVaultKey(chainId, vault)].active;
-    }
-
-    function getChainVaults(uint32 chainId) external view override returns (address[] memory) {
-        return chainVaults[chainId];
-    }
-
-    function pause() external onlyOwner {
-        paused = true;
-        emit Paused(msg.sender);
-    }
-
-    function unpause() external onlyOwner {
-        paused = false;
-        emit Unpaused(msg.sender);
-    }
-
-    function updateVaultShares(uint32 chainId, address vault, uint96 newTotalShares) external override onlyOwner whenNotPaused {
+    function updateVaultShares(uint32 chainId, address vault, uint96 newTotalShares) external override onlyRoles(HANDLER_ROLE) whenNotPaused {
         Errors.verifyChainId(chainId);
         Errors.verifyAddress(vault);
         Errors.verifyNumber(newTotalShares);
@@ -159,6 +143,42 @@ contract VaultRegistry is IVaultRegistry, Ownable {
         }
 
         emit SharesUpdated(chainId, vault, newTotalShares);
+    }
+
+    function pause() external onlyRoles(PAUSER_ROLE) {
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() external onlyRoles(PAUSER_ROLE) {
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
+
+    // Role management functions
+    function grantRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
+        _grantRoles(user, roles);
+    }
+
+    function revokeRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
+        _removeRoles(user, roles);
+    }
+
+    function renounceRoles(uint256 roles) public payable virtual override {
+        _removeRoles(msg.sender, roles);
+    }
+
+    // View functions
+    function getVaultInfo(uint32 chainId, address vault) external view override returns (DataTypes.VaultInfo memory) {
+        return vaults[KeyManager.getVaultKey(chainId, vault)];
+    }
+
+    function isVaultActive(uint32 chainId, address vault) external view override returns (bool) {
+        return vaults[KeyManager.getVaultKey(chainId, vault)].active;
+    }
+
+    function getChainVaults(uint32 chainId) external view override returns (address[] memory) {
+        return chainVaults[chainId];
     }
 
     function validateVaultOperation(uint32 chainId, address vault, uint256 shareAmount) external view returns (bool) {

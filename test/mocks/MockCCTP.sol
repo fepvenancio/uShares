@@ -1,76 +1,91 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity ^0.8.19;
 
 import {ICCTP} from "../../src/interfaces/ICCTP.sol";
 
 contract MockCCTP is ICCTP {
-    // Events to match TokenMessenger events
-    event DepositForBurn(
-        uint64 indexed nonce,
-        address indexed burnToken,
-        uint256 amount,
-        address indexed depositor,
-        bytes32 mintRecipient,
-        uint32 destinationDomain,
-        bytes32 destinationTokenMessenger,
-        bytes32 destinationCaller
-    );
+    address public immutable token;
+    uint32 public immutable domainId;
+    address private _messageTransmitter;
+    address private _localMinter;
+    mapping(uint32 => bytes32) private _remoteTokenMessengers;
+    mapping(address => uint256) public minterAllowances;
 
-    event MintAndWithdraw(address indexed mintRecipient, uint256 amount, address indexed mintToken);
+    constructor(address _token, uint32 _domainId) {
+        token = _token;
+        domainId = _domainId;
+        _messageTransmitter = msg.sender;
+    }
 
-    // State variables
-    mapping(bytes32 => bool) public messages;
-    mapping(bytes32 => bool) public verifiedMessages;
-    uint64 private nonce;
-
-    // Track burned amounts
-    mapping(address => uint256) public burnedAmounts;
-    mapping(bytes32 => bool) public messageProcessed;
+    function setMinterAllowance(address minter, uint256 amount) external {
+        minterAllowances[minter] = amount;
+    }
 
     function depositForBurn(
         uint256 amount,
-        uint32 destinationChainId,
+        uint32 destinationDomain,
         bytes32 mintRecipient,
-        address burnToken
-    ) external override {
-        require(amount > 0, "Amount must be nonzero");
-        require(mintRecipient != bytes32(0), "Mint recipient must be nonzero");
-        require(burnToken != address(0), "Invalid token");
-
-        // Increment nonce for unique message ID
-        nonce++;
-
-        bytes32 messageHash = keccak256(abi.encode(amount, destinationChainId, mintRecipient, nonce));
-        messages[messageHash] = true;
-
-        // Track burned amount
-        burnedAmounts[msg.sender] += amount;
-
-        // Emit event matching Circle's TokenMessenger
-        emit DepositForBurn(
-            nonce,
-            burnToken,
-            amount,
-            msg.sender,
-            mintRecipient,
-            destinationChainId,
-            bytes32(0), // Mock destination messenger
-            bytes32(0) // No specific caller required
-        );
+        address burnTokenAddr
+    ) external override returns (uint64) {
+        return 1;
     }
 
-    function receiveMessage(bytes memory message, bytes memory) external override returns (bool) {
-        // Always return true for testing
+    function depositForBurnWithCaller(
+        uint256 amount,
+        uint32 destinationDomain,
+        bytes32 mintRecipient,
+        address burnTokenAddr,
+        bytes32 destinationCaller
+    ) external override returns (uint64) {
+        return 1;
+    }
+
+    function receiveMessage(
+        uint32 sourceDomain,
+        bytes32 sender,
+        bytes calldata messageBody
+    ) external override returns (bool) {
         return true;
     }
 
-    function verifyMessageHash(bytes memory message, bytes memory) external view override returns (bool) {
-        // Always return true for testing
-        return true;
+    function addRemoteTokenMessenger(uint32 domain, bytes32 tokenMessenger) external override {
+        _remoteTokenMessengers[domain] = tokenMessenger;
     }
 
-    // Helper function to get burned amount
-    function getBurnedAmount(address account) external view returns (uint256) {
-        return burnedAmounts[account];
+    function removeRemoteTokenMessenger(uint32 domain) external override {
+        delete _remoteTokenMessengers[domain];
+    }
+
+    function setLocalMinter(address minter) external override {
+        _localMinter = minter;
+    }
+
+    function removeLocalMinter() external override {
+        _localMinter = address(0);
+    }
+
+    function messageTransmitter() external view override returns (address) {
+        return _messageTransmitter;
+    }
+
+    function messageBodyVersion() external pure override returns (uint32) {
+        return 1;
+    }
+
+    function localMinter() external view override returns (address) {
+        return _localMinter;
+    }
+
+    function remoteTokenMessengers(uint32 domain) external view override returns (bytes32) {
+        return _remoteTokenMessengers[domain];
+    }
+
+    // Additional helper functions (not part of the interface)
+    function getBurnToken() external view returns (address) {
+        return token;
+    }
+
+    function getLocalDomain() external view returns (uint32) {
+        return domainId;
     }
 }

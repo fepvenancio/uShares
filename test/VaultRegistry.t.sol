@@ -65,7 +65,7 @@ contract VaultRegistryTest is BaseTest {
         vm.startPrank(deployer);
 
         // Deploy an invalid vault (not ERC4626 compliant)
-        MockVault invalidVault = new MockVault(ERC20(address(0))); // Invalid asset address
+        MockVault invalidVault = new MockVault(address(0)); // Invalid asset address
 
         // Try to register invalid vault
         vm.expectRevert(Errors.InvalidAsset.selector);

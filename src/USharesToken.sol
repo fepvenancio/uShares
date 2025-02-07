@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {ERC20} from "solady/tokens/ERC20.sol";
-import {Ownable} from "solady/auth/Ownable.sol";
+import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {IUSharesToken} from "./interfaces/IUSharesToken.sol";
 import {ICCTToken} from "./interfaces/ICCTToken.sol";
@@ -20,41 +20,57 @@ import "forge-std/console2.sol";
  * @notice Cross-chain share token implementation for the uShares protocol
  * @dev Represents shares in ERC4626 vaults across different chains
  */
-contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
+contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
     using SafeTransferLib for address;
 
-    // State variables
-    uint32 public immutable chainId;
-    address public immutable positionManager;
-    IVaultRegistry public vaultRegistry;
-    address public ccipAdmin;
-    ICCTP public cctp;
-    IRouter public immutable router;
-    address public tokenPool;
+    /*//////////////////////////////////////////////////////////////
+                                CONSTANTS
+    //////////////////////////////////////////////////////////////*/
 
-    // Role management
-    mapping(address => bool) public minters;
-    mapping(address => bool) public burners;
-    mapping(address => bool) public tokenPools;
+    // Roles
+    uint256 public constant ADMIN_ROLE = _ROLE_0;
+    uint256 public constant MINTER_ROLE = _ROLE_1;
+    uint256 public constant BURNER_ROLE = _ROLE_2;
+    uint256 public constant TOKEN_POOL_ROLE = _ROLE_3;
+    uint256 public constant CCIP_ADMIN_ROLE = _ROLE_4;
 
-    // Vault mappings
-    mapping(uint32 => mapping(address => address)) public chainToVaultMapping;
-
-    // Cross-chain deposit tracking
-    mapping(bytes32 => CrossChainDeposit) public deposits;
-
-    // Message deduplication
-    mapping(bytes32 => bool) public processedMessages;
-
-    // Constants
+    // Protocol Constants
     uint256 public constant PROCESS_TIMEOUT = 1 hours;
     uint256 public constant MAX_TRANSACTION_SIZE = 1_000_000e6; // 1M USDC
-    address public immutable USDC;
 
-    // Emergency control
+    // CCTP V1 Domain Constants
+    uint32 private constant ETHEREUM_DOMAIN = 0;
+    uint32 private constant AVALANCHE_DOMAIN = 1;
+    uint32 private constant OPTIMISM_DOMAIN = 2;
+    uint32 private constant ARBITRUM_DOMAIN = 3;
+    uint32 private constant BASE_DOMAIN = 6;
+    uint32 private constant POLYGON_DOMAIN = 7;
+
+    /*//////////////////////////////////////////////////////////////
+                                STATE
+    //////////////////////////////////////////////////////////////*/
+
+    // Immutable state
+    uint32 public immutable chainId;
+    address public immutable positionManager;
+    address public immutable USDC;
+    IRouter public immutable router;
+
+    // Mutable state
+    IVaultRegistry public vaultRegistry;
+    ICCTP public cctp;
+    address public tokenPool;
     bool public paused;
 
-    // Events from IUSharesToken are inherited
+    // Mappings
+    mapping(uint32 => mapping(address => address)) public chainToVaultMapping;
+    mapping(bytes32 => CrossChainDeposit) public deposits;
+    mapping(bytes32 => CrossChainWithdrawal) public withdrawals;
+    mapping(bytes32 => bool) public processedMessages;
+
+    /*//////////////////////////////////////////////////////////////
+                                MODIFIERS
+    //////////////////////////////////////////////////////////////*/
 
     modifier whenNotPaused() {
         if (paused) revert Errors.Paused();
@@ -62,17 +78,17 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
     }
 
     modifier onlyMinter() {
-        if (!minters[msg.sender]) revert Errors.NotMinter();
+        if (!hasAnyRole(msg.sender, MINTER_ROLE)) revert Errors.NotMinter();
         _;
     }
 
     modifier onlyBurner() {
-        if (!burners[msg.sender]) revert Errors.NotBurner();
+        if (!hasAnyRole(msg.sender, BURNER_ROLE)) revert Errors.NotBurner();
         _;
     }
 
     modifier onlyTokenPool() {
-        if (!tokenPools[msg.sender]) revert Errors.NotTokenPool();
+        if (!hasAnyRole(msg.sender, TOKEN_POOL_ROLE)) revert Errors.NotTokenPool();
         _;
     }
 
@@ -82,9 +98,13 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
     }
 
     modifier onlyCCIPAdmin() {
-        if (msg.sender != ccipAdmin) revert Errors.NotCCIPAdmin();
+        if (!hasAnyRole(msg.sender, CCIP_ADMIN_ROLE)) revert Errors.NotCCIPAdmin();
         _;
     }
+
+    /*//////////////////////////////////////////////////////////////
+                                CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
     constructor(
         string memory _name,
@@ -105,22 +125,119 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         chainId = _chainId;
         positionManager = _positionManager;
         vaultRegistry = IVaultRegistry(address(0)); // Will be set by owner
-        ccipAdmin = _ccipAdmin;
         cctp = ICCTP(_cctp);
         USDC = _usdc;
         router = IRouter(_router);
+        
         _initializeOwner(msg.sender);
-
+        
         // Configure initial roles
-        minters[_positionManager] = true;
-        burners[_positionManager] = true;
+        _grantRoles(msg.sender, ADMIN_ROLE | CCIP_ADMIN_ROLE);
+        _grantRoles(_positionManager, MINTER_ROLE | BURNER_ROLE);
+        _grantRoles(_ccipAdmin, CCIP_ADMIN_ROLE);
+        
         emit MinterConfigured(_positionManager, true);
         emit BurnerConfigured(_positionManager, true);
     }
 
-    // CCT Implementation
+    /*//////////////////////////////////////////////////////////////
+                            ERC20 OVERRIDES
+    //////////////////////////////////////////////////////////////*/
+
+    function name() public pure override returns (string memory) {
+        return "uShares";
+    }
+
+    function symbol() public pure override returns (string memory) {
+        return "uSHR";
+    }
+
+    function decimals() public pure override returns (uint8) {
+        return 6;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ROLE MANAGEMENT
+    //////////////////////////////////////////////////////////////*/
+
+    function grantRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
+        _grantRoles(user, roles);
+    }
+
+    function revokeRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
+        _removeRoles(user, roles);
+    }
+
+    function renounceRoles(uint256 roles) public payable virtual override {
+        _removeRoles(msg.sender, roles);
+    }
+
+    function configureMinter(address minter, bool status) external onlyRoles(ADMIN_ROLE) {
+        Errors.verifyAddress(minter);
+        if (status) {
+            _grantRoles(minter, MINTER_ROLE);
+        } else {
+            _removeRoles(minter, MINTER_ROLE);
+        }
+        emit MinterConfigured(minter, status);
+    }
+
+    function configureBurner(address burner, bool status) external onlyRoles(ADMIN_ROLE) {
+        Errors.verifyAddress(burner);
+        if (status) {
+            _grantRoles(burner, BURNER_ROLE);
+        } else {
+            _removeRoles(burner, BURNER_ROLE);
+        }
+        emit BurnerConfigured(burner, status);
+    }
+
+    function configureTokenPool(address pool, bool status) external onlyCCIPAdmin {
+        _configureTokenPool(pool, status);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ADMIN FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function setVaultMapping(uint32 targetChain, address localVault, address remoteVault) external onlyCCIPAdmin {
+        Errors.verifyAddress(localVault);
+        Errors.verifyAddress(remoteVault);
+
+        chainToVaultMapping[targetChain][localVault] = remoteVault;
+        emit VaultMapped(targetChain, localVault, remoteVault);
+    }
+
+    function setCCTPContract(address _cctp) external onlyCCIPAdmin {
+        Errors.verifyAddress(_cctp);
+        cctp = ICCTP(_cctp);
+    }
+
+    function setTokenPool(address pool) external onlyCCIPAdmin {
+        Errors.verifyAddress(pool);
+        tokenPool = pool;
+        _configureTokenPool(pool, true);
+    }
+
+    function setVaultRegistry(address _vaultRegistry) external onlyRoles(ADMIN_ROLE) {
+        Errors.verifyAddress(_vaultRegistry);
+        vaultRegistry = IVaultRegistry(_vaultRegistry);
+    }
+
+    function pause() external onlyCCIPAdmin {
+        paused = true;
+    }
+
+    function unpause() external onlyCCIPAdmin {
+        paused = false;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            CCT IMPLEMENTATION
+    //////////////////////////////////////////////////////////////*/
+
     function lockOrBurn(LockOrBurnParams calldata params) external returns (bytes memory message) {
-        if (!tokenPools[msg.sender]) revert Errors.NotTokenPool();
+        if (!hasAnyRole(msg.sender, TOKEN_POOL_ROLE)) revert Errors.NotTokenPool();
         Errors.verifyAddress(params.receiver);
         Errors.verifyNumber(params.amount);
 
@@ -167,7 +284,7 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
     }
 
     function releaseOrMint(ReleaseOrMintParams calldata params) external returns (uint256) {
-        if (!tokenPools[msg.sender]) revert Errors.NotTokenPool();
+        if (!hasAnyRole(msg.sender, TOKEN_POOL_ROLE)) revert Errors.NotTokenPool();
         Errors.verifyAddress(params.receiver);
         Errors.verifyNumber(params.amount);
 
@@ -208,7 +325,10 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         return params.amount;
     }
 
-    // Cross-chain deposit flow
+    /*//////////////////////////////////////////////////////////////
+                            CROSS-CHAIN DEPOSIT FLOW
+    //////////////////////////////////////////////////////////////*/
+
     function initiateDeposit(
         address targetVault,
         uint256 usdcAmount,
@@ -229,6 +349,9 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         address remoteVault = chainToVaultMapping[uint32(destinationChainSelector)][targetVault];
         if (remoteVault == address(0)) revert Errors.InvalidVault();
         if (!vaultRegistry.isVaultActive(uint32(destinationChainSelector), remoteVault)) revert Errors.VaultNotActive();
+
+        // Convert chain selector to CCTP domain
+        uint32 destinationDomain = _getDestinationDomain(uint32(destinationChainSelector));
 
         // Transfer USDC from user
         USDC.safeTransferFrom(msg.sender, address(this), usdcAmount);
@@ -259,9 +382,9 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         // Initiate CCTP burn
         USDC.safeApprove(address(cctp), usdcAmount);
         cctp.depositForBurn(
-            usdcAmount, 
-            uint32(destinationChainSelector), 
-            bytes32(uint256(uint160(address(this)))), 
+            usdcAmount,
+            destinationDomain,
+            bytes32(uint256(uint160(address(this)))), // Convert contract address to bytes32
             USDC
         );
 
@@ -319,8 +442,18 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         if (deposit.cctpCompleted) revert Errors.CCTPAlreadyCompleted();
         if (block.timestamp > deposit.deadline) revert Errors.DepositExpired();
 
-        // Step 1: Verify CCTP message
-        cctp.receiveMessage(attestation, bytes(""));
+        // Verify CCTP message format and attestation
+        (uint32 sourceDomain, bytes32 sender, bytes memory message) = abi.decode(attestation, (uint32, bytes32, bytes));
+        if (sourceDomain != BASE_DOMAIN) revert Errors.InvalidChain();
+        
+        // Verify message hasn't been processed
+        bytes32 messageHash = keccak256(abi.encode(sourceDomain, sender, message));
+        if (processedMessages[messageHash]) revert Errors.DuplicateMessage();
+        processedMessages[messageHash] = true;
+
+        // Verify CCTP message
+        bool success = cctp.receiveMessage(sourceDomain, sender, message);
+        if (!success) revert Errors.InvalidMessage();
 
         // Mark CCTP as completed
         deposit.cctpCompleted = true;
@@ -337,84 +470,132 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         this.mintSharesFromDeposit(depositId, vaultShares);
     }
 
-    // Withdrawal flow
-    function withdraw(uint256 uSharesAmount, address vault) external whenNotPaused {
+    /*//////////////////////////////////////////////////////////////
+                            CROSS-CHAIN WITHDRAWAL FLOW
+    //////////////////////////////////////////////////////////////*/
+
+    function initiateWithdrawal(
+        uint256 uSharesAmount,
+        address targetVault,
+        uint256 minUSDC,
+        uint256 deadline
+    ) external whenNotPaused returns (bytes32 withdrawalId) {
         Errors.verifyNumber(uSharesAmount);
+        Errors.verifyAddress(targetVault);
         if (uSharesAmount > MAX_TRANSACTION_SIZE) revert Errors.ExceedsMaxSize();
+        if (block.timestamp > deadline) revert Errors.DepositExpired();
+
+        // Get vault mapping to verify vault and get destination chain
+        uint32 destinationChain;
+        address remoteVault;
+        for (uint32 i = 1; i < 100; i++) {  // Reasonable limit for chain IDs
+            remoteVault = chainToVaultMapping[i][targetVault];
+            if (remoteVault != address(0)) {
+                destinationChain = i;
+                break;
+            }
+        }
+        if (remoteVault == address(0)) revert Errors.InvalidVault();
+
+        // Generate withdrawal ID
+        withdrawalId = keccak256(
+            abi.encodePacked(
+                msg.sender, uSharesAmount, targetVault, destinationChain, minUSDC, deadline, block.timestamp
+            )
+        );
+
+        // Create withdrawal record
+        withdrawals[withdrawalId] = CrossChainWithdrawal({
+            user: msg.sender,
+            uSharesAmount: uSharesAmount,
+            sourceVault: targetVault,
+            targetVault: remoteVault,
+            destinationChain: destinationChain,
+            usdcAmount: 0,
+            cctpCompleted: false,
+            sharesWithdrawn: false,
+            timestamp: block.timestamp,
+            minUSDC: minUSDC,
+            deadline: deadline
+        });
 
         // Burn uShares
         _burn(msg.sender, uSharesAmount);
 
-        // Withdraw USDC from vault
-        uint256 usdcAmount = IVault(vault).withdraw(uSharesAmount, msg.sender, address(this));
-        if (usdcAmount == 0) revert Errors.InvalidAmount();
+        // Update position if it exists
+        bytes32 positionKey = IPositionManager(positionManager).getPositionKey(
+            msg.sender,
+            chainId,
+            destinationChain,
+            remoteVault
+        );
+
+        if (IPositionManager(positionManager).isHandler(msg.sender)) {
+            IPositionManager(positionManager).updatePosition(positionKey, 0);
+        }
+
+        emit WithdrawalInitiated(
+            withdrawalId,
+            msg.sender,
+            uSharesAmount,
+            targetVault,
+            destinationChain,
+            minUSDC,
+            deadline
+        );
+    }
+
+    function processWithdrawalCompletion(bytes32 withdrawalId, bytes calldata attestation) external {
+        CrossChainWithdrawal storage withdrawal = withdrawals[withdrawalId];
+        if (withdrawal.user == address(0)) revert Errors.InvalidWithdrawal();
+        if (withdrawal.cctpCompleted) revert Errors.CCTPAlreadyCompleted();
+        if (block.timestamp > withdrawal.deadline) revert Errors.WithdrawalExpired();
+
+        // Verify CCTP message format and attestation
+        (uint32 sourceDomain, bytes32 sender, bytes memory message) = abi.decode(attestation, (uint32, bytes32, bytes));
+        if (sourceDomain != BASE_DOMAIN) revert Errors.InvalidChain();
+        
+        // Verify message hasn't been processed
+        bytes32 messageHash = keccak256(abi.encode(sourceDomain, sender, message));
+        if (processedMessages[messageHash]) revert Errors.DuplicateMessage();
+        processedMessages[messageHash] = true;
+
+        // Verify CCTP message
+        bool success = cctp.receiveMessage(sourceDomain, sender, message);
+        if (!success) revert Errors.InvalidMessage();
+
+        // Decode USDC amount from message
+        uint256 usdcAmount = abi.decode(message, (uint256));
+        if (usdcAmount < withdrawal.minUSDC) revert Errors.InsufficientUSDC();
+
+        // Mark CCTP as completed
+        withdrawal.cctpCompleted = true;
+        withdrawal.usdcAmount = usdcAmount;
+        withdrawal.sharesWithdrawn = true;
 
         // Transfer USDC to user
-        USDC.safeTransfer(msg.sender, usdcAmount);
+        USDC.safeTransfer(withdrawal.user, usdcAmount);
+
+        emit WithdrawalCompleted(withdrawalId, withdrawal.user, usdcAmount);
     }
 
-    // Admin functions
-    function setVaultMapping(uint32 targetChain, address localVault, address remoteVault) external onlyCCIPAdmin {
-        Errors.verifyAddress(localVault);
-        Errors.verifyAddress(remoteVault);
+    // Recovery function for stale withdrawals
+    function recoverStaleWithdrawal(bytes32 withdrawalId) external {
+        CrossChainWithdrawal storage withdrawal = withdrawals[withdrawalId];
+        if (withdrawal.user == address(0)) revert Errors.InvalidWithdrawal();
+        if (block.timestamp <= withdrawal.timestamp + PROCESS_TIMEOUT) revert Errors.InvalidWithdrawal();
+        if (withdrawal.sharesWithdrawn) revert Errors.WithdrawalProcessed();
 
-        chainToVaultMapping[targetChain][localVault] = remoteVault;
-        emit VaultMapped(targetChain, localVault, remoteVault);
+        // Return uShares to user since withdrawal failed
+        _mint(withdrawal.user, withdrawal.uSharesAmount);
+
+        delete withdrawals[withdrawalId];
     }
 
-    function setCCTPContract(address _cctp) external onlyCCIPAdmin {
-        Errors.verifyAddress(_cctp);
-        cctp = ICCTP(_cctp);
-    }
+    /*//////////////////////////////////////////////////////////////
+                            RECOVERY FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
-    function configureMinter(address minter, bool status) external onlyOwner {
-        Errors.verifyAddress(minter);
-        minters[minter] = status;
-        emit MinterConfigured(minter, status);
-    }
-
-    function configureBurner(address burner, bool status) external onlyOwner {
-        Errors.verifyAddress(burner);
-        burners[burner] = status;
-        emit BurnerConfigured(burner, status);
-    }
-
-    function configureTokenPool(address pool, bool status) external onlyCCIPAdmin {
-        _configureTokenPool(pool, status);
-    }
-
-    function getTokenPool() external view returns (address) {
-        return tokenPool;
-    }
-
-    function setTokenPool(address pool) external onlyCCIPAdmin {
-        Errors.verifyAddress(pool);
-        tokenPool = pool;
-        // Configure token pool permissions
-        _configureTokenPool(pool, true);
-    }
-
-    function pause() external onlyCCIPAdmin {
-        paused = true;
-    }
-
-    function unpause() external onlyCCIPAdmin {
-        paused = false;
-    }
-
-    function setCCIPAdmin(address newAdmin) external onlyOwner {
-        Errors.verifyAddress(newAdmin);
-        address oldAdmin = ccipAdmin;
-        ccipAdmin = newAdmin;
-        emit CCIPAdminUpdated(oldAdmin, newAdmin);
-    }
-
-    function setVaultRegistry(address _vaultRegistry) external onlyOwner {
-        Errors.verifyAddress(_vaultRegistry);
-        vaultRegistry = IVaultRegistry(_vaultRegistry);
-    }
-
-    // Recovery functions
     function recoverStaleDeposit(bytes32 depositId) external {
         CrossChainDeposit storage deposit = deposits[depositId];
         if (deposit.user == address(0)) revert Errors.InvalidDeposit();
@@ -429,41 +610,10 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         delete deposits[depositId];
     }
 
-    // View functions
-    function getDeposit(bytes32 depositId) external view returns (CrossChainDeposit memory) {
-        return deposits[depositId];
-    }
+    /*//////////////////////////////////////////////////////////////
+                            CROSS-CHAIN TOKEN FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
-    function getVaultMapping(uint32 targetChain, address localVault) external view returns (address) {
-        return chainToVaultMapping[targetChain][localVault];
-    }
-
-    function getCCTPContract() external view returns (address) {
-        return address(cctp);
-    }
-
-    function getChainId() external view returns (uint32) {
-        return chainId;
-    }
-
-    function getCCIPAdmin() external view returns (address) {
-        return ccipAdmin;
-    }
-
-    // ERC20 Implementation
-    function name() public pure override returns (string memory) {
-        return "uShares";
-    }
-
-    function symbol() public pure override returns (string memory) {
-        return "uSHR";
-    }
-
-    function decimals() public pure override returns (uint8) {
-        return 6;
-    }
-
-    // Cross-chain token functions
     function mint(address to, uint256 amount) external onlyPositionManager {
         Errors.verifyAddress(to);
         Errors.verifyNumber(amount);
@@ -484,19 +634,54 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         _burn(from, amount);
     }
 
-    // Internal functions
+    /*//////////////////////////////////////////////////////////////
+                            VIEW FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function getTokenPool() external view returns (address) {
+        return tokenPool;
+    }
+
+    function getDeposit(bytes32 depositId) external view returns (CrossChainDeposit memory) {
+        return deposits[depositId];
+    }
+
+    function getWithdrawal(bytes32 withdrawalId) external view returns (CrossChainWithdrawal memory) {
+        return withdrawals[withdrawalId];
+    }
+
+    function getVaultMapping(uint32 targetChain, address localVault) external view returns (address) {
+        return chainToVaultMapping[targetChain][localVault];
+    }
+
+    function getCCTPContract() external view returns (address) {
+        return address(cctp);
+    }
+
+    function getChainId() external view returns (uint32) {
+        return chainId;
+    }
+
+    function getCCIPAdmin() external view returns (address) {
+        return address(this); // The contract itself is the CCIP admin
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
     function _configureTokenPool(address pool, bool status) internal {
         Errors.verifyAddress(pool);
-        tokenPools[pool] = status;
-        // Token pools need both minting and burning permissions
-        minters[pool] = status;
-        burners[pool] = status;
+        if (status) {
+            _grantRoles(pool, TOKEN_POOL_ROLE | MINTER_ROLE | BURNER_ROLE);
+        } else {
+            _removeRoles(pool, TOKEN_POOL_ROLE | MINTER_ROLE | BURNER_ROLE);
+        }
         emit TokenPoolConfigured(pool, status);
         emit MinterConfigured(pool, status);
         emit BurnerConfigured(pool, status);
     }
 
-    // Internal function for vault deposits
     function depositToVault(
         address vault,
         uint256 amount,
@@ -513,4 +698,20 @@ contract USharesToken is IUSharesToken, ICCTToken, ERC20, Ownable {
         
         return shares;
     }
+
+    function _getDestinationDomain(uint32 _chainId) internal pure returns (uint32) {
+        // If the chainId is already a CCTP domain, return it directly
+        if (_chainId <= 7) return _chainId;
+
+        // Otherwise, convert from chain ID to CCTP domain
+        if (_chainId == 1) return ETHEREUM_DOMAIN;
+        if (_chainId == 43114) return AVALANCHE_DOMAIN;
+        if (_chainId == 10) return OPTIMISM_DOMAIN;
+        if (_chainId == 42161) return ARBITRUM_DOMAIN;
+        if (_chainId == 8453) return BASE_DOMAIN;
+        if (_chainId == 137) return POLYGON_DOMAIN;
+        revert Errors.InvalidChain();
+    }
+
+    error InvalidMessage();
 }

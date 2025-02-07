@@ -1,38 +1,43 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {ERC20} from "solady/tokens/ERC20.sol";
-import {ERC4626} from "solady/tokens/ERC4626.sol";
+import {IVault} from "../../src/interfaces/IVault.sol";
+import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 
-contract MockVault is ERC4626 {
-    ERC20 private immutable _asset;
+contract MockVault is IVault {
+    using SafeTransferLib for address;
 
-    constructor(ERC20 asset_) {
-        _asset = asset_;
+    address public immutable assetToken;
+
+    constructor(address _assetToken) {
+        assetToken = _assetToken;
     }
 
-    function name() public pure override returns (string memory) {
-        return "Mock Vault";
+    function deposit(uint256 assets, address receiver) external returns (uint256 shares) {
+        // 1:1 conversion for testing
+        assetToken.safeTransferFrom(msg.sender, address(this), assets);
+        return assets;
     }
 
-    function symbol() public pure override returns (string memory) {
-        return "vUSDC";
+    function withdraw(uint256 shares, address receiver, address owner) external returns (uint256 assets) {
+        // 1:1 conversion for testing
+        assetToken.safeTransfer(receiver, shares);
+        return shares;
     }
 
-    function decimals() public pure override returns (uint8) {
-        return 6;
+    function convertToShares(uint256 assets) external view returns (uint256) {
+        return assets;
     }
 
-    function asset() public view override returns (address) {
-        return address(_asset);
+    function convertToAssets(uint256 shares) external view returns (uint256) {
+        return shares;
     }
 
-    function totalAssets() public view override returns (uint256) {
-        return _asset.balanceOf(address(this));
+    function totalAssets() external view returns (uint256) {
+        return 0;
     }
 
-    // Override previewDeposit to return a predictable amount
-    function previewDeposit(uint256 assets) public pure override returns (uint256) {
-        return assets; // 1:1 ratio for testing
+    function asset() external view returns (address) {
+        return assetToken;
     }
 }

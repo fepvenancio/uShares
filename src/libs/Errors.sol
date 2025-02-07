@@ -21,6 +21,7 @@ library Errors {
     error InvalidChain();
     error InvalidVault();
     error InvalidDeposit();
+    error InvalidWithdrawal();
     error InvalidDestination();
     error InvalidAsset();
 
@@ -39,6 +40,10 @@ library Errors {
     error DuplicateMessage();
     error ExceedsMaxSize();
     error SuspiciousSharePriceChange();
+    error InvalidMessage();
+    error WithdrawalExpired();
+    error InsufficientUSDC();
+    error WithdrawalProcessed();
 
     // Validation functions
     function verifyAddress(address addr) internal pure {

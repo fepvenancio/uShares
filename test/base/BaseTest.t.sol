@@ -34,7 +34,7 @@ abstract contract BaseTest is Test {
 
         // Deploy mock contracts for external dependencies
         usdc = new MockUSDC();
-        vault = new MockVault(usdc);
+        vault = new MockVault(address(usdc));
 
         // Deploy real contracts we're testing
         registry = new VaultRegistry(address(usdc));

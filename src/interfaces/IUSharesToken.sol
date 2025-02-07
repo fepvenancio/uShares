@@ -23,6 +23,20 @@ interface IUSharesToken {
         uint256 deadline;
     }
 
+    struct CrossChainWithdrawal {
+        address user;
+        uint256 uSharesAmount;
+        address sourceVault;
+        address targetVault;
+        uint32 destinationChain;
+        uint256 usdcAmount;
+        bool cctpCompleted;
+        bool sharesWithdrawn;
+        uint256 timestamp;
+        uint256 minUSDC;
+        uint256 deadline;
+    }
+
     // CCT Standard structs
     struct LockOrBurnInV1 {
         address sender;
@@ -70,6 +84,22 @@ interface IUSharesToken {
         uint256 vaultShares
     );
 
+    event WithdrawalInitiated(
+        bytes32 indexed withdrawalId,
+        address indexed user,
+        uint256 uSharesAmount,
+        address targetVault,
+        uint32 destinationChain,
+        uint256 minUSDC,
+        uint256 deadline
+    );
+
+    event WithdrawalCompleted(
+        bytes32 indexed withdrawalId,
+        address indexed user,
+        uint256 usdcAmount
+    );
+
     event VaultMapped(uint32 indexed chainId, address indexed localVault, address indexed remoteVault);
 
     event TokensMinted(address indexed to, uint256 amount, uint32 sourceChain, bytes32 messageId);
@@ -96,6 +126,18 @@ interface IUSharesToken {
 
     function mintSharesFromDeposit(bytes32 depositId, uint256 vaultShares) external;
 
+    // Withdrawal functions
+    function initiateWithdrawal(
+        uint256 uSharesAmount,
+        address targetVault,
+        uint256 minUSDC,
+        uint256 deadline
+    ) external returns (bytes32 withdrawalId);
+
+    function processWithdrawalCompletion(bytes32 withdrawalId, bytes calldata attestation) external;
+
+    function recoverStaleWithdrawal(bytes32 withdrawalId) external;
+
     // Admin functions
     function setVaultMapping(uint32 chainId, address localVault, address remoteVault) external;
 
@@ -109,6 +151,7 @@ interface IUSharesToken {
 
     // View functions
     function getDeposit(bytes32 depositId) external view returns (CrossChainDeposit memory);
+    function getWithdrawal(bytes32 withdrawalId) external view returns (CrossChainWithdrawal memory);
     function getVaultMapping(uint32 chainId, address localVault) external view returns (address);
     function getCCTPContract() external view returns (address);
     function getChainId() external view returns (uint32);

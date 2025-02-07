@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Ownable} from "solady/auth/Ownable.sol";
+import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {ERC20} from "solady/tokens/ERC20.sol";
 import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
@@ -14,9 +14,13 @@ import {Errors} from "./libs/Errors.sol";
  * @notice Manages user positions across different chains and vaults
  * @dev Tracks and manages user positions in cross-chain vaults
  */
-contract PositionManager is IPositionManager, Ownable {
+contract PositionManager is IPositionManager, OwnableRoles {
     using SafeTransferLib for ERC20;
     using KeyManager for *;
+
+    // Roles
+    uint256 public constant ADMIN_ROLE = _ROLE_0;
+    uint256 public constant HANDLER_ROLE = _ROLE_1;
 
     // State variables
     IVaultRegistry public immutable vaultRegistry;
@@ -32,7 +36,7 @@ contract PositionManager is IPositionManager, Ownable {
     mapping(uint32 => bytes32[]) public chainPositions;
 
     modifier onlyHandler() {
-        if (!handlers[msg.sender]) revert Errors.NotHandler();
+        if (!hasAnyRole(msg.sender, HANDLER_ROLE)) revert Errors.NotHandler();
         _;
     }
 
@@ -40,6 +44,7 @@ contract PositionManager is IPositionManager, Ownable {
         Errors.verifyAddress(_vaultRegistry);
         vaultRegistry = IVaultRegistry(_vaultRegistry);
         _initializeOwner(msg.sender);
+        _grantRoles(msg.sender, ADMIN_ROLE | HANDLER_ROLE);
     }
 
     /**
@@ -174,14 +179,32 @@ contract PositionManager is IPositionManager, Ownable {
         return chainPositions[sourceChain].length;
     }
 
-    function configureHandler(address handler, bool status) external onlyOwner {
+    // Role management functions
+    function grantRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
+        _grantRoles(user, roles);
+    }
+
+    function revokeRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
+        _removeRoles(user, roles);
+    }
+
+    function renounceRoles(uint256 roles) public payable virtual override {
+        _removeRoles(msg.sender, roles);
+    }
+
+    function configureHandler(address handler, bool status) external onlyRoles(ADMIN_ROLE) {
         Errors.verifyAddress(handler);
+        if (status) {
+            _grantRoles(handler, HANDLER_ROLE);
+        } else {
+            _removeRoles(handler, HANDLER_ROLE);
+        }
         handlers[handler] = status;
         emit HandlerConfigured(handler, status);
     }
 
     function isHandler(address handler) external view returns (bool) {
-        return handlers[handler];
+        return hasAnyRole(handler, HANDLER_ROLE);
     }
 
     function getPosition(bytes32 positionKey) external view returns (Position memory) {
