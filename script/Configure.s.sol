@@ -2,12 +2,13 @@
 pragma solidity 0.8.28;
 
 import "forge-std/Script.sol";
-import "../src/USharesToken.sol";
-import "../src/VaultRegistry.sol";
-import "../src/PositionManager.sol";
+import {USharesToken} from "../src/USharesToken.sol";
+import {VaultRegistry} from "../src/VaultRegistry.sol";
+import {PositionManager} from "../src/PositionManager.sol";
 import {ERC20} from "solady/tokens/ERC20.sol";
 import {ERC4626} from "solady/tokens/ERC4626.sol";
 import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
+import {RateLimiter} from "../src/libs/RateLimiter.sol";
 
 contract ConfigureScript is Script {
     // Chain configuration
@@ -16,6 +17,10 @@ contract ConfigureScript is Script {
 
     // Role constants from USharesToken
     uint256 constant TOKEN_POOL_ROLE = 1 << 3; // _ROLE_3
+
+    // Rate limit configuration
+    uint256 constant RATE_LIMIT_CAPACITY = 1_000_000e6; // 1M USDC
+    uint256 constant RATE_LIMIT_REFILL = 100_000e6; // 100k USDC per second
 
     function run() external {
         // Load deployer private key from environment
@@ -31,6 +36,7 @@ contract ConfigureScript is Script {
         address vault = vm.envAddress("VAULT_ADDRESS");
         address tokenPool = vm.envAddress("TOKEN_POOL");
         address ccipAdmin = vm.envAddress("CCIP_ADMIN");
+        address remoteTokenPool = vm.envAddress("REMOTE_TOKEN_POOL");
 
         console.log("Configuring uShares protocol with deployer:", deployer);
 
@@ -44,14 +50,27 @@ contract ConfigureScript is Script {
         uint256 initialShares = ERC4626(vault).totalSupply();
         VaultRegistry(registry).updateVaultShares(DEST_CHAIN, vault, uint96(initialShares));
         
+        // Configure rate limits
+        RateLimiter.Config memory rateLimitConfig = RateLimiter.Config({
+            rate: RATE_LIMIT_REFILL,
+            capacity: RATE_LIMIT_CAPACITY,
+            isEnabled: true
+        });
+        VaultRegistry(registry).configureRateLimit(DEST_CHAIN, vault, rateLimitConfig);
+        
+        // Configure token pool
+        VaultRegistry(registry).configureTokenPool(DEST_CHAIN, tokenPool);
+        
         console.log("Vault registered:", vault);
         console.log("Initial shares:", initialShares);
+        console.log("Rate limits configured");
 
         // 2. Configure PositionManager
         console.log("Configuring PositionManager...");
         PositionManager(positionManager).configureHandler(token, true);
         PositionManager(positionManager).configureHandler(tokenPool, true);
-        console.log("Handlers configured for token and pool");
+        PositionManager(positionManager).configureTokenPool(DEST_CHAIN, tokenPool);
+        console.log("Handlers and token pool configured");
 
         vm.stopBroadcast();
         vm.startBroadcast(vm.envUint("CCIP_ADMIN_KEY"));
@@ -64,7 +83,13 @@ contract ConfigureScript is Script {
         // Set up cross-chain mappings
         USharesToken(token).setVaultMapping(SOURCE_CHAIN, tokenPool, vault);
         
+        // Configure remote token pool
+        if (remoteTokenPool != address(0)) {
+            USharesToken(token).setRemoteTokenPool(DEST_CHAIN, remoteTokenPool);
+        }
+        
         console.log("Token pool configured:", tokenPool);
+        console.log("Remote token pool:", remoteTokenPool);
         console.log("Vault mappings set for chains:", SOURCE_CHAIN, DEST_CHAIN);
 
         vm.stopBroadcast();
@@ -81,11 +106,13 @@ contract ConfigureScript is Script {
         bool isVaultActive = VaultRegistry(registry).isVaultActive(DEST_CHAIN, vault);
         bool isTokenPoolConfigured = USharesToken(token).hasAnyRole(tokenPool, TOKEN_POOL_ROLE);
         bool isHandlerConfigured = PositionManager(positionManager).isHandler(token);
+        bool isRateLimitConfigured = VaultRegistry(registry).getRateLimitState(DEST_CHAIN, vault).isEnabled;
         address mappedVault = USharesToken(token).getVaultMapping(DEST_CHAIN, tokenPool);
         
         require(isVaultActive, "Vault not active");
         require(isTokenPoolConfigured, "Token pool not configured");
         require(isHandlerConfigured, "Handler not configured");
+        require(isRateLimitConfigured, "Rate limit not configured");
         require(mappedVault == vault, "Invalid vault mapping");
 
         // Log final configuration state
@@ -94,6 +121,7 @@ contract ConfigureScript is Script {
         console.log("Vault active:", isVaultActive);
         console.log("Token pool configured:", isTokenPoolConfigured);
         console.log("Handler configured:", isHandlerConfigured);
+        console.log("Rate limit configured:", isRateLimitConfigured);
         console.log("Mapped vault:", mappedVault);
         console.log("Initial shares:", initialShares);
 

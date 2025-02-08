@@ -34,7 +34,7 @@ library Errors {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Thrown when an address parameter is zero
-    error ZeroAddress(address addr);
+    error ZeroAddress();
     /// @notice Thrown when a bytes32 parameter is zero
     error ZeroBytes(bytes32 key);
     /// @notice Thrown when a number parameter is zero
@@ -43,6 +43,8 @@ library Errors {
     error ZeroChainId();
     /// @notice Thrown when an amount is invalid
     error InvalidAmount();
+    /// @notice Thrown when a configuration is invalid
+    error InvalidConfig();
     /// @notice Thrown when a chain ID is invalid
     error InvalidChain();
     /// @notice Thrown when a vault address is invalid
@@ -66,6 +68,8 @@ library Errors {
     error VaultActive();
     /// @notice Thrown when vault already exists
     error VaultExists();
+    /// @notice Thrown when vault is not found
+    error VaultNotFound();
     /// @notice Thrown when contract is paused
     error Paused();
     /// @notice Thrown when CCTP transfer is already completed
@@ -96,6 +100,41 @@ library Errors {
     error InsufficientUSDC();
     /// @notice Thrown when withdrawal is already processed
     error WithdrawalProcessed();
+    /// @notice Thrown when rate limit is exceeded
+    error RateLimitExceeded(address token, uint256 requested, uint256 available);
+
+    /// @notice Thrown when CCTP message processing fails
+    error CCTPMessageFailed();
+
+    /// @notice Thrown when a deadline has passed
+    error InvalidDeadline();
+
+    /// @notice Thrown when a token is not supported
+    error InvalidToken(address token);
+
+    /// @notice Thrown when a chain is not supported
+    error ChainNotAllowed(uint64 chainSelector);
+
+    /// @notice Thrown when a chain already exists
+    error ChainAlreadyExists(uint64 chainSelector);
+
+    /// @notice Thrown when a chain does not exist
+    error NonExistentChain(uint64 remoteChainSelector);
+
+    /// @notice Thrown when a source pool is invalid
+    error InvalidSourcePool(address pool);
+
+    /// @notice Thrown when a source pool address is invalid
+    error InvalidSourcePoolAddress(bytes sourcePoolAddress);
+
+    /// @notice Thrown when a pool is already added
+    error PoolAlreadyAdded(uint64 chainSelector, bytes remotePool);
+
+    /// @notice Thrown when a remote pool is invalid for a chain
+    error InvalidRemotePoolForChain(uint64 chainSelector, bytes remotePool);
+
+    /// @notice Thrown when slippage exceeds maximum allowed
+    error ExcessiveSlippage();
 
     /*//////////////////////////////////////////////////////////////
                             VALIDATION FUNCTIONS
@@ -108,7 +147,7 @@ library Errors {
      */
     function verifyAddress(address addr) internal pure {
         if (addr == address(0)) {
-            revert ZeroAddress(addr);
+            revert ZeroAddress();
         }
     }
 

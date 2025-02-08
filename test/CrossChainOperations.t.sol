@@ -5,19 +5,9 @@ import {BaseTest} from "./base/BaseTest.t.sol";
 import {DataTypes} from "../src/types/DataTypes.sol";
 import {Pool} from "../src/libs/Pool.sol";
 
-contract USharesTokenCrossChainDepositTest is BaseTest {
+contract CrossChainOperationsTest is BaseTest {
     uint256 constant DEPOSIT_AMOUNT = 100_000e6;
     uint256 constant INITIAL_MINT = 1_000_000e6;
-
-    function setUp() public override {
-        super.setUp();
-
-        // Setup initial balances
-        vm.startPrank(admin);
-        baseUSDC.mint(user, INITIAL_MINT);
-        optimismUSDC.mint(address(optimismVault), INITIAL_MINT);
-        vm.stopPrank();
-    }
 
     function test_CrossChainDeposit_Base_To_Optimism() public {
         vm.startPrank(user);
@@ -102,22 +92,6 @@ contract USharesTokenCrossChainDepositTest is BaseTest {
         vm.stopPrank();
     }
 
-    function test_RevertWhen_DuplicateMessage() public {
-        // First do a valid cross-chain deposit
-        test_CrossChainDeposit_Base_To_Optimism();
-
-        // Try to replay the same message
-        bytes memory message = abi.encode(
-            Pool.LockOrBurnOutV1({
-                destTokenAddress: abi.encode(address(optimismUSDC)),
-                destPoolData: abi.encode(DEPOSIT_AMOUNT)
-            })
-        );
-
-        vm.expectRevert("Duplicate message");
-        _sendMessageBaseToOptimism(message);
-    }
-
     function test_RevertWhen_InvalidVault() public {
         address invalidVault = makeAddr("invalidVault");
 
@@ -129,6 +103,21 @@ contract USharesTokenCrossChainDepositTest is BaseTest {
             OPTIMISM_CHAIN,
             invalidVault,
             DEPOSIT_AMOUNT,
+            0
+        );
+
+        vm.stopPrank();
+    }
+
+    function test_RevertWhen_ZeroAmount() public {
+        vm.startPrank(user);
+        baseUSDC.approve(address(baseToken), 0);
+
+        vm.expectRevert("Amount must be greater than 0");
+        baseToken.initiateDeposit(
+            OPTIMISM_CHAIN,
+            address(optimismVault),
+            0,
             0
         );
 
@@ -151,4 +140,20 @@ contract USharesTokenCrossChainDepositTest is BaseTest {
 
         vm.stopPrank();
     }
-}
+
+    function test_RevertWhen_DuplicateMessage() public {
+        // First do a valid cross-chain deposit
+        test_CrossChainDeposit_Base_To_Optimism();
+
+        // Try to replay the same message
+        bytes memory message = abi.encode(
+            Pool.LockOrBurnOutV1({
+                destTokenAddress: abi.encode(address(optimismUSDC)),
+                destPoolData: abi.encode(DEPOSIT_AMOUNT)
+            })
+        );
+
+        vm.expectRevert("Duplicate message");
+        _sendMessageBaseToOptimism(message);
+    }
+} 

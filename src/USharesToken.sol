@@ -5,1023 +5,633 @@ import {ERC20} from "solady/tokens/ERC20.sol";
 import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {IUSharesToken} from "./interfaces/IUSharesToken.sol";
-import {ICCTToken} from "./interfaces/ICCTToken.sol";
-import {ICCTP} from "./interfaces/ICCTP.sol";
-import {IVault} from "./interfaces/IVault.sol";
-import {IRouter} from "./interfaces/IRouter.sol";
-import {Errors} from "./libs/Errors.sol";
-import {IPositionManager} from "./interfaces/IPositionManager.sol";
 import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
-import {DataTypes} from "./types/DataTypes.sol";
-import "forge-std/console2.sol";
+import {ICCTP} from "./interfaces/ICCTP.sol";
+import {DataTypes} from "./libs/DataTypes.sol";
+import {Errors} from "./libs/Errors.sol";
+import {ITokenReceiver} from "./interfaces/ITokenReceiver.sol";
 
 /**
  * @title USharesToken
- * @notice Cross-chain share token implementation for the uShares protocol
- * @dev Represents shares in ERC4626 vaults across different chains, implementing
- *      cross-chain token (CCT) standard and Circle's CCTP for USDC transfers
- * @custom:security-contact security@ushares.com
+ * @notice Implementation of the UShares token contract
+ * @dev This contract is responsible for managing the UShares token and its cross-chain functionality
  */
-contract USharesToken is IUSharesToken, ICCTToken, ERC20, OwnableRoles {
+contract USharesToken is IUSharesToken, ERC20, OwnableRoles {
     using SafeTransferLib for address;
 
     /*//////////////////////////////////////////////////////////////
                                 CONSTANTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Role identifier for admin operations
-    uint256 public constant ADMIN_ROLE = _ROLE_0;
-    
-    /// @notice Role identifier for minting tokens
-    uint256 public constant MINTER_ROLE = _ROLE_1;
-    
-    /// @notice Role identifier for burning tokens
-    uint256 public constant BURNER_ROLE = _ROLE_2;
-    
-    /// @notice Role identifier for token pool operations
-    uint256 public constant TOKEN_POOL_ROLE = _ROLE_3;
-    
-    /// @notice Role identifier for CCIP admin operations
-    uint256 public constant CCIP_ADMIN_ROLE = _ROLE_4;
+    uint256 internal constant ADMIN_ROLE = _ROLE_0;
+    uint256 internal constant MINTER_ROLE = _ROLE_1;
+    uint256 internal constant BURNER_ROLE = _ROLE_2;
 
-    /// @notice Timeout period for processing cross-chain operations
-    uint256 public constant PROCESS_TIMEOUT = 1 hours;
-    
-    /// @notice Maximum transaction size in USDC (1M USDC)
-    uint256 public constant MAX_TRANSACTION_SIZE = 1_000_000e6;
-
-    /// @notice CCTP domain identifier for Ethereum
-    uint32 private constant ETHEREUM_DOMAIN = 0;
-    /// @notice CCTP domain identifier for Avalanche
-    uint32 private constant AVALANCHE_DOMAIN = 1;
-    /// @notice CCTP domain identifier for Optimism
-    uint32 private constant OPTIMISM_DOMAIN = 2;
-    /// @notice CCTP domain identifier for Arbitrum
-    uint32 private constant ARBITRUM_DOMAIN = 3;
-    /// @notice CCTP domain identifier for Base
-    uint32 private constant BASE_DOMAIN = 6;
-    /// @notice CCTP domain identifier for Polygon
-    uint32 private constant POLYGON_DOMAIN = 7;
+    uint256 internal constant MIN_USDC_AMOUNT = 1e6; // 1 USDC
+    uint256 internal constant MAX_USDC_AMOUNT = 1000000e6; // 1M USDC
 
     /*//////////////////////////////////////////////////////////////
-                                STATE
+                                 EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Chain ID where this contract is deployed
-    uint32 public immutable chainId;
-    
-    /// @notice Address of the position manager contract
-    address public immutable positionManager;
-    
-    /// @notice Address of the USDC token contract
-    address public immutable USDC;
-    
-    /// @notice Address of the CCIP router contract
-    IRouter public immutable router;
+    event CCTPSet(address indexed cctp);
+    event TokenPoolConfigured(address indexed tokenPool, bool enabled);
+    event VaultMappingSet(uint32 indexed destinationChain, address indexed tokenPool, address indexed vault);
+    event TokensRecovered(address indexed token, address indexed to, uint256 amount);
+    event LimitsUpdated(uint256 minAmount, uint256 maxAmount);
+    event MaxSlippageUpdated(uint256 maxSlippage);
+    event SharesUpdated(uint32 indexed chainId, address indexed vault, uint256 shares);
+    event RemoteTokenMessengerSet(uint32 indexed domain, bytes32 indexed messenger);
+    event RemoteTokenMessengerRemoved(uint32 indexed domain);
 
-    /// @notice Address of the vault registry contract
-    IVaultRegistry public vaultRegistry;
-    
-    /// @notice Address of the CCTP contract
-    ICCTP public cctp;
-    
-    /// @notice Address of the token pool
-    address public tokenPool;
-    
-    /// @notice Pause state of the contract
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Whether the contract is paused
     bool public paused;
 
-    /// @notice Mapping of chain ID and local vault to remote vault address
-    mapping(uint32 => mapping(address => address)) public chainToVaultMapping;
-    
-    /// @notice Mapping of deposit ID to cross-chain deposit details
-    mapping(bytes32 => DataTypes.CrossChainDeposit) public deposits;
-    
-    /// @notice Mapping of withdrawal ID to cross-chain withdrawal details
-    mapping(bytes32 => DataTypes.CrossChainWithdrawal) public withdrawals;
-    
+    /// @notice Whether this chain is the issuing chain
+    bool public immutable isIssuingChain;
+
+    /// @notice The vault registry contract
+    address public vaultRegistry;
+
+    /// @notice The CCTP contract
+    address public cctp;
+
+    /// @notice The chain ID where this token was originally deployed
+    uint32 public immutable issuingDomain;
+
+    /// @notice The token pool contract
+    address public tokenPool;
+
+    /// @notice Minimum amount for transactions
+    uint256 public minAmount = 1e6; // 1 USDC
+
+    /// @notice Maximum amount for transactions
+    uint256 public maxAmount = 1000000e6; // 1M USDC
+
+    /// @notice Maximum slippage allowed (10000 = 100%)
+    uint256 public maxSlippage = 100; // 1%
+
+    /// @notice Mapping of domain to vault mapping
+    mapping(uint32 => mapping(address => address)) public domainToVaultMapping;
+
+    /// @notice Mapping of deposit IDs to deposit data
+    mapping(bytes32 => DataTypes.CrossChainDeposit) private _deposits;
+    function deposits(bytes32 depositId) external view returns (DataTypes.CrossChainDeposit memory) {
+        return _deposits[depositId];
+    }
+
+    /// @notice Mapping of withdrawal IDs to withdrawal data
+    mapping(bytes32 => DataTypes.CrossChainWithdrawal) private _withdrawals;
+    function withdrawals(bytes32 withdrawalId) external view returns (DataTypes.CrossChainWithdrawal memory) {
+        return _withdrawals[withdrawalId];
+    }
+
     /// @notice Mapping to track processed CCTP messages
     mapping(bytes32 => bool) public processedMessages;
 
+    /// @notice The USDC token contract
+    address public immutable USDC;
+
+    /// @notice The domain where this contract is deployed
+    uint32 public immutable domain;
+
+    /// @notice The CCTP message body version
+    uint32 public immutable messageBodyVersion;
+
+    /// @notice Mapping of domain to remote token messenger
+    mapping(uint32 => bytes32) public remoteTokenMessengers;
+
+    /// @notice The token receiver contract for vault interactions
+    address public tokenReceiver;
+
     /*//////////////////////////////////////////////////////////////
-                                MODIFIERS
+                               MODIFIERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Ensures the contract is not paused
     modifier whenNotPaused() {
         if (paused) revert Errors.Paused();
         _;
     }
 
-    /// @notice Ensures caller has minter role
-    modifier onlyMinter() {
-        if (!hasAnyRole(msg.sender, MINTER_ROLE)) revert Errors.NotMinter();
-        _;
-    }
-
-    /// @notice Ensures caller has burner role
-    modifier onlyBurner() {
-        if (!hasAnyRole(msg.sender, BURNER_ROLE)) revert Errors.NotBurner();
-        _;
-    }
-
-    /// @notice Ensures caller has token pool role
-    modifier onlyTokenPool() {
-        if (!hasAnyRole(msg.sender, TOKEN_POOL_ROLE)) revert Errors.NotTokenPool();
-        _;
-    }
-
-    /// @notice Ensures caller is the position manager
-    modifier onlyPositionManager() {
-        if (msg.sender != positionManager) revert Errors.NotPositionManager();
-        _;
-    }
-
-    /// @notice Ensures caller has CCIP admin role
-    modifier onlyCCIPAdmin() {
-        if (!hasAnyRole(msg.sender, CCIP_ADMIN_ROLE)) revert Errors.NotCCIPAdmin();
-        _;
-    }
-
     /*//////////////////////////////////////////////////////////////
-                                CONSTRUCTOR
+                              CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Initializes the USharesToken contract
-     * @dev Sets up initial state and grants roles to deployer
-     * @param _name Token name (unused)
-     * @param _symbol Token symbol (unused)
-     * @param _chainId Chain ID where contract is deployed
-     * @param _positionManager Address of position manager contract
-     * @param _ccipAdmin Address of CCIP admin
-     * @param _cctp Address of CCTP contract
-     * @param _usdc Address of USDC token contract
-     * @param _router Address of CCIP router contract
-     */
     constructor(
-        string memory _name,
-        string memory _symbol,
-        uint32 _chainId,
-        address _positionManager,
-        address _ccipAdmin,
+        uint32 _domain,
+        bool _isIssuingChain,
         address _cctp,
         address _usdc,
-        address _router
+        address _tokenReceiver
     ) {
-        Errors.verifyAddress(_positionManager);
-        Errors.verifyAddress(_ccipAdmin);
         Errors.verifyAddress(_cctp);
         Errors.verifyAddress(_usdc);
-        Errors.verifyAddress(_router);
+        Errors.verifyAddress(_tokenReceiver);
 
-        chainId = _chainId;
-        positionManager = _positionManager;
-        vaultRegistry = IVaultRegistry(address(0)); // Will be set by owner
-        cctp = ICCTP(_cctp);
+        domain = _domain;
+        isIssuingChain = _isIssuingChain;
+        cctp = _cctp;
         USDC = _usdc;
-        router = IRouter(_router);
-        
+        tokenReceiver = _tokenReceiver;
+
         _initializeOwner(msg.sender);
-        
-        // Configure initial roles
-        _grantRoles(msg.sender, ADMIN_ROLE | CCIP_ADMIN_ROLE);
-        _grantRoles(_positionManager, MINTER_ROLE | BURNER_ROLE);
-        _grantRoles(_ccipAdmin, CCIP_ADMIN_ROLE);
-        
-        emit MinterConfigured(_positionManager, true);
-        emit BurnerConfigured(_positionManager, true);
+        _grantRoles(msg.sender, ADMIN_ROLE | MINTER_ROLE | BURNER_ROLE);
     }
 
     /*//////////////////////////////////////////////////////////////
-                            ERC20 OVERRIDES
+                           EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Returns the name of the token
-     * @return string Token name
+     * @notice Pause the contract
      */
-    function name() public pure override returns (string memory) {
-        return "uShares";
+    function pause() external onlyRoles(ADMIN_ROLE) {
+        paused = true;
+        emit Paused(msg.sender);
     }
 
     /**
-     * @notice Returns the symbol of the token
-     * @return string Token symbol
+     * @notice Unpause the contract
      */
-    function symbol() public pure override returns (string memory) {
-        return "uSHR";
+    function unpause() external onlyRoles(ADMIN_ROLE) {
+        paused = false;
+        emit Unpaused(msg.sender);
     }
 
     /**
-     * @notice Returns the number of decimals used by the token
-     * @return uint8 Number of decimals (6)
-     */
-    function decimals() public pure override returns (uint8) {
-        return 6;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            ROLE MANAGEMENT
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Grants roles to a user
-     * @dev Only callable by admin
-     * @param user Address to grant roles to
-     * @param roles Roles to grant
-     */
-    function grantRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
-        _grantRoles(user, roles);
-    }
-
-    /**
-     * @notice Revokes roles from a user
-     * @dev Only callable by admin
-     * @param user Address to revoke roles from
-     * @param roles Roles to revoke
-     */
-    function revokeRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
-        _removeRoles(user, roles);
-    }
-
-    /**
-     * @notice Allows a user to renounce their own roles
-     * @param roles Roles to renounce
-     */
-    function renounceRoles(uint256 roles) public payable virtual override {
-        _removeRoles(msg.sender, roles);
-    }
-
-    /**
-     * @notice Configures a minter address
-     * @dev Only callable by admin
-     * @param minter Address to configure as minter
-     * @param status True to grant minter role, false to revoke
-     * @custom:emits MinterConfigured event
-     */
-    function configureMinter(address minter, bool status) external onlyRoles(ADMIN_ROLE) {
-        Errors.verifyAddress(minter);
-        if (status) {
-            _grantRoles(minter, MINTER_ROLE);
-        } else {
-            _removeRoles(minter, MINTER_ROLE);
-        }
-        emit MinterConfigured(minter, status);
-    }
-
-    /**
-     * @notice Configures a burner address
-     * @dev Only callable by admin
-     * @param burner Address to configure as burner
-     * @param status True to grant burner role, false to revoke
-     * @custom:emits BurnerConfigured event
-     */
-    function configureBurner(address burner, bool status) external onlyRoles(ADMIN_ROLE) {
-        Errors.verifyAddress(burner);
-        if (status) {
-            _grantRoles(burner, BURNER_ROLE);
-        } else {
-            _removeRoles(burner, BURNER_ROLE);
-        }
-        emit BurnerConfigured(burner, status);
-    }
-
-    /**
-     * @notice Configures a token pool address
-     * @dev Only callable by CCIP admin
-     * @param pool Address to configure as token pool
-     * @param status True to grant token pool role, false to revoke
-     * @custom:emits TokenPoolConfigured, MinterConfigured, and BurnerConfigured events
-     */
-    function configureTokenPool(address pool, bool status) external onlyCCIPAdmin {
-        _configureTokenPool(pool, status);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            ADMIN FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Maps a local vault to a remote vault on another chain
-     * @dev Only callable by CCIP admin
-     * @param targetChain Chain ID of the remote vault
-     * @param localVault Address of the local vault
-     * @param remoteVault Address of the remote vault on the target chain
-     * @custom:emits VaultMapped event
-     */
-    function setVaultMapping(uint32 targetChain, address localVault, address remoteVault) external onlyCCIPAdmin {
-        Errors.verifyAddress(localVault);
-        Errors.verifyAddress(remoteVault);
-
-        chainToVaultMapping[targetChain][localVault] = remoteVault;
-        emit VaultMapped(targetChain, localVault, remoteVault);
-    }
-
-    /**
-     * @notice Updates the CCTP contract address
-     * @dev Only callable by CCIP admin
-     * @param _cctp New CCTP contract address
-     */
-    function setCCTPContract(address _cctp) external onlyCCIPAdmin {
-        Errors.verifyAddress(_cctp);
-        cctp = ICCTP(_cctp);
-    }
-
-    /**
-     * @notice Sets the token pool address and configures its roles
-     * @dev Only callable by CCIP admin
-     * @param pool Address of the new token pool
-     * @custom:emits TokenPoolConfigured, MinterConfigured, and BurnerConfigured events
-     */
-    function setTokenPool(address pool) external onlyCCIPAdmin {
-        Errors.verifyAddress(pool);
-        tokenPool = pool;
-        _configureTokenPool(pool, true);
-    }
-
-    /**
-     * @notice Updates the vault registry address
-     * @dev Only callable by admin
-     * @param _vaultRegistry New vault registry address
+     * @notice Set the vault registry contract
+     * @param _vaultRegistry The address of the vault registry contract
      */
     function setVaultRegistry(address _vaultRegistry) external onlyRoles(ADMIN_ROLE) {
         Errors.verifyAddress(_vaultRegistry);
-        vaultRegistry = IVaultRegistry(_vaultRegistry);
+        vaultRegistry = _vaultRegistry;
+        emit VaultRegistrySet(_vaultRegistry);
     }
 
     /**
-     * @notice Sets the pause state of the contract
-     * @dev Only callable by CCIP admin
+     * @notice Set the CCTP contract
+     * @param _cctp The address of the CCTP contract
      */
-    function pause() external onlyCCIPAdmin {
-        paused = true;
+    function setCCTP(address _cctp) external onlyRoles(ADMIN_ROLE) {
+        Errors.verifyAddress(_cctp);
+        cctp = _cctp;
+        emit CCTPSet(_cctp);
     }
 
     /**
-     * @notice Unpauses the contract
-     * @dev Only callable by CCIP admin
+     * @notice Configure the token pool contract
+     * @param _tokenPool The address of the token pool contract
+     * @param enabled Whether to enable or disable the token pool
      */
-    function unpause() external onlyCCIPAdmin {
-        paused = false;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            CCT IMPLEMENTATION
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Locks or burns tokens for cross-chain transfer
-     * @dev Implements CCT standard for token locking/burning
-     * @param params Parameters for the lock/burn operation
-     * @return message Encoded message for cross-chain communication
-     */
-    function lockOrBurn(DataTypes.LockOrBurnParams calldata params) external returns (bytes memory message) {
-        if (!hasAnyRole(msg.sender, TOKEN_POOL_ROLE)) revert Errors.NotTokenPool();
-        Errors.verifyAddress(params.receiver);
-        Errors.verifyNumber(params.amount);
-
-        // Check max transaction size
-        if (params.amount > MAX_TRANSACTION_SIZE) revert Errors.ExceedsMaxSize();
-
-        // Get vault address from mapping
-        address targetVault = chainToVaultMapping[uint32(params.destinationChainSelector)][msg.sender];
-        Errors.verifyAddress(targetVault);
-
-        // Get vault info from registry
-        DataTypes.VaultInfo memory vaultInfo = IVaultRegistry(vaultRegistry).getVaultInfo(
-            uint32(params.destinationChainSelector),
-            targetVault
-        );
-        if (!vaultInfo.active) revert Errors.VaultNotActive();
-
-        // Update position if it exists
-        bytes32 positionKey = IPositionManager(positionManager).getPositionKey(
-            msg.sender,
-            chainId,
-            uint32(params.destinationChainSelector),
-            vaultInfo.vaultAddress
-        );
-
-        if (IPositionManager(positionManager).isHandler(msg.sender)) {
-            IPositionManager(positionManager).updatePosition(positionKey, 0); // Zero shares on source chain
+    function configureTokenPool(address _tokenPool, bool enabled) external onlyRoles(ADMIN_ROLE) {
+        Errors.verifyAddress(_tokenPool);
+        if (enabled) {
+            tokenPool = _tokenPool;
+        } else {
+            tokenPool = address(0);
         }
-
-        // Burn tokens
-        _burn(msg.sender, params.amount);
-
-        // Call CCTP to burn tokens
-        USDC.safeApprove(address(cctp), params.amount);
-        cctp.depositForBurn(
-            params.amount,
-            uint32(params.destinationChainSelector),
-            bytes32(uint256(uint160(params.receiver))),
-            USDC
-        );
-
-        // Return CCIP message
-        return abi.encode(params.depositId, params.receiver, params.amount);
+        emit TokenPoolConfigured(_tokenPool, enabled);
     }
 
     /**
-     * @notice Releases or mints tokens from cross-chain transfer
-     * @dev Implements CCT standard for token release/minting
-     * @param params Parameters for the release/mint operation
-     * @return uint256 Amount of tokens released/minted
-     */
-    function releaseOrMint(DataTypes.ReleaseOrMintParams calldata params) external returns (uint256) {
-        if (!hasAnyRole(msg.sender, TOKEN_POOL_ROLE)) revert Errors.NotTokenPool();
-        Errors.verifyAddress(params.receiver);
-        Errors.verifyNumber(params.amount);
-
-        // Check max transaction size
-        if (params.amount > MAX_TRANSACTION_SIZE) revert Errors.ExceedsMaxSize();
-
-        // Get vault address from mapping
-        address sourceVault = chainToVaultMapping[uint32(params.sourceChainSelector)][msg.sender];
-        Errors.verifyAddress(sourceVault);
-
-        // Get vault info from registry
-        DataTypes.VaultInfo memory vaultInfo = IVaultRegistry(vaultRegistry).getVaultInfo(
-            uint32(params.sourceChainSelector),
-            sourceVault
-        );
-        if (!vaultInfo.active) revert Errors.VaultNotActive();
-
-        // Update position if it exists
-        bytes32 positionKey = IPositionManager(positionManager).getPositionKey(
-            msg.sender,
-            uint32(params.sourceChainSelector),
-            chainId,
-            vaultInfo.vaultAddress
-        );
-
-        if (IPositionManager(positionManager).isHandler(msg.sender)) {
-            IPositionManager(positionManager).updatePosition(positionKey, params.amount);
-        }
-
-        // Check if message has already been processed
-        bytes32 messageHash = keccak256(abi.encode(params.depositId, params.amount));
-        if (processedMessages[messageHash]) revert Errors.DuplicateMessage();
-        processedMessages[messageHash] = true;
-
-        // Mint tokens
-        _mint(params.receiver, params.amount);
-
-        return params.amount;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            CROSS-CHAIN DEPOSIT FLOW
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Initiates a cross-chain deposit of USDC to mint uShares
-     * @dev Handles the first step of the cross-chain deposit process
-     * @param targetVault Address of the vault on the source chain
-     * @param usdcAmount Amount of USDC to deposit
-     * @param destinationChainSelector Chain ID where shares will be minted
-     * @param minShares Minimum number of shares to receive
-     * @param deadline Timestamp after which the deposit is invalid
-     * @return depositId Unique identifier for tracking the deposit
-     * @custom:emits DepositInitiated event
-     * @custom:requirements
-     * - Contract must not be paused
-     * - Target vault must be registered and active
-     * - USDC amount must not exceed MAX_TRANSACTION_SIZE
-     * - Deadline must be in the future
-     * - User must have approved sufficient USDC
+     * @notice Initiate a cross-chain deposit
+     * @param targetVault The address of the vault on the destination chain
+     * @param usdcAmount The amount of USDC to deposit
+     * @param destinationDomain The destination domain ID
+     * @param minShares The minimum amount of shares to receive
+     * @param deadline The deadline for the deposit
+     * @return depositId The ID of the deposit
      */
     function initiateDeposit(
         address targetVault,
         uint256 usdcAmount,
-        uint64 destinationChainSelector,
+        uint32 destinationDomain,
         uint256 minShares,
         uint256 deadline
-    ) external whenNotPaused returns (bytes32 depositId) {
-        // Validate inputs
-        Errors.verifyAddress(targetVault);
-        Errors.verifyNumber(usdcAmount);
-        Errors.verifyNumber(minShares);
-        if (block.timestamp > deadline) revert Errors.DepositExpired();
+    ) external whenNotPaused returns (bytes32) {
+        // Verify destination chain and vault
+        if (!IVaultRegistry(vaultRegistry).isVaultActive(destinationDomain, targetVault)) revert Errors.VaultNotActive();
 
-        // Check max transaction size
-        if (usdcAmount > MAX_TRANSACTION_SIZE) revert Errors.ExceedsMaxSize();
+        // Verify vault mapping
+        address expectedVault = domainToVaultMapping[destinationDomain][tokenPool];
+        if (expectedVault == address(0) || expectedVault != targetVault) revert Errors.InvalidVault();
 
-        // Verify vault mapping exists and vault is active
-        address remoteVault = chainToVaultMapping[uint32(destinationChainSelector)][targetVault];
-        if (remoteVault == address(0)) revert Errors.InvalidVault();
-        if (!vaultRegistry.isVaultActive(uint32(destinationChainSelector), remoteVault)) revert Errors.VaultNotActive();
+        // Check transaction size
+        if (usdcAmount < minAmount || usdcAmount > maxAmount) revert Errors.InvalidAmount();
 
-        // Convert chain selector to CCTP domain
-        uint32 destinationDomain = _getDestinationDomain(uint32(destinationChainSelector));
+        // Check deadline
+        if (block.timestamp > deadline) revert Errors.InvalidDeadline();
 
         // Transfer USDC from user
         USDC.safeTransferFrom(msg.sender, address(this), usdcAmount);
 
         // Generate deposit ID
-        depositId = keccak256(
+        bytes32 depositId = keccak256(
             abi.encodePacked(
-                msg.sender, usdcAmount, targetVault, destinationChainSelector, minShares, deadline, block.timestamp
+                msg.sender,
+                destinationDomain,
+                targetVault,
+                usdcAmount,
+                minShares,
+                deadline,
+                block.timestamp
             )
         );
 
-        // Create deposit record
-        deposits[depositId] = DataTypes.CrossChainDeposit({
+        // Store deposit details
+        _deposits[depositId] = DataTypes.CrossChainDeposit({
             user: msg.sender,
             usdcAmount: usdcAmount,
-            sourceVault: targetVault,
-            targetVault: remoteVault,
-            destinationChain: uint32(destinationChainSelector),
-            vaultShares: 0,
-            uSharesMinted: 0,
-            cctpCompleted: false,
-            sharesIssued: false,
-            timestamp: block.timestamp,
-            minShares: minShares,
-            deadline: deadline
+            destinationDomain: destinationDomain,
+            targetVault: targetVault,
+            deadline: deadline,
+            status: DataTypes.CrossChainStatus.Pending,
+            cctpCompleted: false
         });
 
+        // Approve USDC for CCTP
+        USDC.safeApprove(cctp, usdcAmount);
+
         // Initiate CCTP burn
-        USDC.safeApprove(address(cctp), usdcAmount);
-        cctp.depositForBurn(
+        uint64 nonce = ICCTP(cctp).depositForBurn(
             usdcAmount,
             destinationDomain,
-            bytes32(uint256(uint160(address(this)))), // Convert contract address to bytes32
+            bytes32(uint256(uint160(targetVault))),
             USDC
         );
 
-        emit DepositInitiated(
-            depositId, 
-            msg.sender, 
-            usdcAmount, 
-            targetVault, 
-            uint32(destinationChainSelector), 
-            minShares, 
-            deadline
-        );
+        emit DepositInitiated(depositId, msg.sender, usdcAmount, targetVault, destinationDomain, minShares, deadline);
+
+        return depositId;
     }
 
     /**
-     * @notice Mints shares from a cross-chain deposit
-     * @dev Called after CCTP completion to mint shares to the user
-     * @param depositId Unique identifier for the deposit
-     * @param vaultShares Amount of vault shares to mint
-     * @custom:emits SharesIssued event
-     * @custom:requirements
-     * - CCTP must be completed
-     * - Shares must not already be issued
-     * - Deposit must not be expired
-     * - Vault shares must meet minimum requirement
+     * @notice Process a CCTP completion
+     * @param depositId The ID of the deposit
+     * @param attestation The CCTP attestation data
      */
-    function mintSharesFromDeposit(bytes32 depositId, uint256 vaultShares) external {
-        DataTypes.CrossChainDeposit storage deposit = deposits[depositId];
-        if (!deposit.cctpCompleted) revert Errors.CCTPAlreadyCompleted();
-        if (deposit.sharesIssued) revert Errors.ActiveShares();
+    function processCCTPCompletion(
+        bytes32 depositId,
+        bytes calldata attestation
+    ) external whenNotPaused {
+        DataTypes.CrossChainDeposit storage deposit = _deposits[depositId];
+        if (deposit.status != DataTypes.CrossChainStatus.Pending) revert Errors.InvalidDeposit();
         if (block.timestamp > deposit.deadline) revert Errors.DepositExpired();
-        if (vaultShares < deposit.minShares) revert Errors.InsufficientShares();
 
-        deposit.vaultShares = vaultShares;
-        deposit.uSharesMinted = vaultShares; // 1:1 minting
-        deposit.sharesIssued = true;
+        // Process CCTP mint
+        bool success = ICCTP(cctp).receiveMessage(
+            deposit.destinationDomain,
+            bytes32(uint256(uint160(deposit.targetVault))),
+            attestation
+        );
+        if (!success) revert Errors.CCTPMessageFailed();
 
-        // Create or update position
-        bytes32 positionKey = IPositionManager(positionManager).getPositionKey(
-            deposit.user,
-            chainId,
-            deposit.destinationChain,
+        // Deposit USDC into vault through TokenReceiver
+        uint256 vaultShares = ITokenReceiver(tokenReceiver).depositToVault(
+            deposit.targetVault,
+            USDC,
+            deposit.usdcAmount
+        );
+
+        // Mint uShares to the depositor
+        _mint(deposit.user, vaultShares);
+        emit Minted(deposit.user, vaultShares);
+
+        // Update vault shares
+        uint256 newShares = IVaultRegistry(vaultRegistry).updateVaultShares(
+            deposit.destinationDomain,
+            deposit.targetVault,
+            deposit.usdcAmount
+        );
+
+        deposit.status = DataTypes.CrossChainStatus.Completed;
+        deposit.cctpCompleted = true;
+
+        emit CCTPCompleted(
+            depositId,
+            deposit.usdcAmount,
+            deposit.destinationDomain,
             deposit.targetVault
         );
-
-        // Try to update position first, if it fails (not found), create a new one
-        try IPositionManager(positionManager).updatePosition(positionKey, vaultShares) {
-            // Position updated successfully
-        } catch {
-            // Position doesn't exist, create it
-            IPositionManager(positionManager).createPosition(
-                deposit.user,
-                chainId,
-                deposit.destinationChain,
-                deposit.targetVault,
-                vaultShares
-            );
-        }
-
-        _mint(deposit.user, vaultShares);
-        emit SharesIssued(depositId, deposit.user, vaultShares, vaultShares);
+        emit SharesUpdated(deposit.destinationDomain, deposit.targetVault, newShares);
     }
 
     /**
-     * @notice Processes the completion of a CCTP transfer for a deposit
-     * @dev Verifies CCTP message, updates deposit state, and mints shares
-     * @param depositId Unique identifier for the deposit
-     * @param attestation CCTP message attestation data
-     * @custom:emits CCTPCompleted event
-     * @custom:emits SharesIssued event
-     * @custom:requirements
-     * - Deposit must exist
-     * - CCTP must not be already completed
-     * - Deposit must not be expired
-     * - CCTP message must be valid and from correct domain
-     * - Message must not be previously processed
-     */
-    function processCCTPCompletion(bytes32 depositId, bytes calldata attestation) external {
-        DataTypes.CrossChainDeposit storage deposit = deposits[depositId];
-        if (deposit.user == address(0)) revert Errors.InvalidDeposit();
-        if (deposit.cctpCompleted) revert Errors.CCTPAlreadyCompleted();
-        if (block.timestamp > deposit.deadline) revert Errors.DepositExpired();
-
-        // Verify CCTP message format and attestation
-        (uint32 sourceDomain, bytes32 sender, bytes memory message) = abi.decode(attestation, (uint32, bytes32, bytes));
-        if (sourceDomain != BASE_DOMAIN) revert Errors.InvalidChain();
-        
-        // Verify message hasn't been processed
-        bytes32 messageHash = keccak256(abi.encode(sourceDomain, sender, message));
-        if (processedMessages[messageHash]) revert Errors.DuplicateMessage();
-        processedMessages[messageHash] = true;
-
-        // Verify CCTP message
-        bool success = cctp.receiveMessage(sourceDomain, sender, message);
-        if (!success) revert Errors.InvalidMessage();
-
-        // Mark CCTP as completed
-        deposit.cctpCompleted = true;
-        emit CCTPCompleted(depositId, deposit.usdcAmount, deposit.destinationChain, deposit.targetVault);
-
-        // Step 2: Deposit into vault and mint shares
-        uint256 vaultShares = depositToVault(
-            deposit.targetVault,
-            deposit.usdcAmount,
-            deposit.minShares
-        );
-        
-        // Mint shares to user
-        this.mintSharesFromDeposit(depositId, vaultShares);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            CROSS-CHAIN WITHDRAWAL FLOW
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Initiates a cross-chain withdrawal of shares
-     * @dev Burns uShares tokens and creates withdrawal record
-     * @param uSharesAmount Amount of uShares to withdraw
-     * @param targetVault Address of the vault to withdraw from
-     * @param minUSDC Minimum USDC amount to receive
-     * @param deadline Timestamp after which withdrawal is invalid
-     * @return withdrawalId Unique identifier for tracking the withdrawal
-     * @custom:emits WithdrawalInitiated event
-     * @custom:requirements
-     * - Contract must not be paused
-     * - Amount must not exceed MAX_TRANSACTION_SIZE
-     * - Deadline must be in the future
-     * - Target vault must be registered and mapped
+     * @notice Initiate a cross-chain withdrawal
+     * @param uSharesAmount The amount of uShares tokens to withdraw
+     * @param targetVault The vault to withdraw from
+     * @param minUSDC The minimum amount of USDC to receive
+     * @param deadline The deadline for the withdrawal
+     * @return withdrawalId The ID of the withdrawal
      */
     function initiateWithdrawal(
         uint256 uSharesAmount,
         address targetVault,
         uint256 minUSDC,
         uint256 deadline
-    ) external whenNotPaused returns (bytes32 withdrawalId) {
-        Errors.verifyNumber(uSharesAmount);
-        Errors.verifyAddress(targetVault);
-        if (uSharesAmount > MAX_TRANSACTION_SIZE) revert Errors.ExceedsMaxSize();
-        if (block.timestamp > deadline) revert Errors.DepositExpired();
+    ) external whenNotPaused returns (bytes32) {
+        // Verify vault is active
+        if (!IVaultRegistry(vaultRegistry).isVaultActive(domain, targetVault)) revert Errors.VaultNotActive();
 
-        // Get vault mapping to verify vault and get destination chain
-        uint32 destinationChain;
-        address remoteVault;
-        for (uint32 i = 1; i < 100; i++) {  // Reasonable limit for chain IDs
-            remoteVault = chainToVaultMapping[i][targetVault];
-            if (remoteVault != address(0)) {
-                destinationChain = i;
-                break;
-            }
-        }
-        if (remoteVault == address(0)) revert Errors.InvalidVault();
+        // Check transaction size
+        if (uSharesAmount < minAmount || uSharesAmount > maxAmount) revert Errors.InvalidAmount();
+
+        // Check deadline
+        if (block.timestamp > deadline) revert Errors.InvalidDeadline();
 
         // Generate withdrawal ID
-        withdrawalId = keccak256(
+        bytes32 withdrawalId = keccak256(
             abi.encodePacked(
-                msg.sender, uSharesAmount, targetVault, destinationChain, minUSDC, deadline, block.timestamp
+                msg.sender,
+                domain,
+                targetVault,
+                uSharesAmount,
+                minUSDC,
+                deadline,
+                block.timestamp
             )
         );
 
-        // Create withdrawal record
-        withdrawals[withdrawalId] = DataTypes.CrossChainWithdrawal({
+        // Store withdrawal details
+        _withdrawals[withdrawalId] = DataTypes.CrossChainWithdrawal({
             user: msg.sender,
-            uSharesAmount: uSharesAmount,
-            sourceVault: targetVault,
-            targetVault: remoteVault,
-            destinationChain: destinationChain,
-            usdcAmount: 0,
-            cctpCompleted: false,
-            sharesWithdrawn: false,
-            timestamp: block.timestamp,
-            minUSDC: minUSDC,
-            deadline: deadline
+            usdcAmount: uSharesAmount,
+            destinationDomain: domain,
+            targetVault: targetVault,
+            deadline: deadline,
+            status: DataTypes.CrossChainStatus.Pending,
+            cctpCompleted: false
         });
 
-        // Burn uShares
+        // Burn tokens
         _burn(msg.sender, uSharesAmount);
 
-        // Update position if it exists
-        bytes32 positionKey = IPositionManager(positionManager).getPositionKey(
-            msg.sender,
-            chainId,
-            destinationChain,
-            remoteVault
-        );
-
-        if (IPositionManager(positionManager).isHandler(msg.sender)) {
-            IPositionManager(positionManager).updatePosition(positionKey, 0);
-        }
-
-        emit WithdrawalInitiated(
-            withdrawalId,
-            msg.sender,
+        // Initiate CCTP burn for withdrawal
+        uint64 nonce = ICCTP(cctp).depositForBurn(
             uSharesAmount,
-            targetVault,
-            destinationChain,
-            minUSDC,
-            deadline
+            domain,
+            bytes32(uint256(uint160(msg.sender))), // Recipient is the withdrawing user
+            USDC
         );
+
+        // Update vault shares
+        uint256 newShares = IVaultRegistry(vaultRegistry).updateVaultShares(
+            domain,
+            targetVault,
+            uSharesAmount
+        );
+
+        emit WithdrawalInitiated(withdrawalId, msg.sender, uSharesAmount, targetVault, domain, minUSDC, deadline);
+        emit SharesUpdated(domain, targetVault, newShares);
+
+        return withdrawalId;
     }
 
     /**
-     * @notice Processes the completion of a CCTP transfer for a withdrawal
-     * @dev Verifies CCTP message and transfers USDC to user
-     * @param withdrawalId Unique identifier for the withdrawal
-     * @param attestation CCTP message attestation data
-     * @custom:emits WithdrawalCompleted event
-     * @custom:requirements
-     * - Withdrawal must exist
-     * - CCTP must not be already completed
-     * - Withdrawal must not be expired
-     * - CCTP message must be valid and from correct domain
-     * - Message must not be previously processed
-     * - USDC amount must meet minimum requirement
+     * @notice Process a withdrawal completion
+     * @param withdrawalId The ID of the withdrawal
+     * @param attestation The CCTP attestation data
      */
-    function processWithdrawalCompletion(bytes32 withdrawalId, bytes calldata attestation) external {
-        DataTypes.CrossChainWithdrawal storage withdrawal = withdrawals[withdrawalId];
-        if (withdrawal.user == address(0)) revert Errors.InvalidWithdrawal();
-        if (withdrawal.cctpCompleted) revert Errors.CCTPAlreadyCompleted();
+    function processWithdrawalCompletion(
+        bytes32 withdrawalId,
+        bytes calldata attestation
+    ) external whenNotPaused {
+        DataTypes.CrossChainWithdrawal storage withdrawal = _withdrawals[withdrawalId];
+        if (withdrawal.status != DataTypes.CrossChainStatus.Pending) revert Errors.InvalidWithdrawal();
         if (block.timestamp > withdrawal.deadline) revert Errors.WithdrawalExpired();
 
-        // Verify CCTP message format and attestation
-        (uint32 sourceDomain, bytes32 sender, bytes memory message) = abi.decode(attestation, (uint32, bytes32, bytes));
-        if (sourceDomain != BASE_DOMAIN) revert Errors.InvalidChain();
-        
-        // Verify message hasn't been processed
-        bytes32 messageHash = keccak256(abi.encode(sourceDomain, sender, message));
-        if (processedMessages[messageHash]) revert Errors.DuplicateMessage();
-        processedMessages[messageHash] = true;
+        // Process CCTP mint
+        bool success = ICCTP(cctp).receiveMessage(
+            withdrawal.destinationDomain,
+            bytes32(uint256(uint160(withdrawal.targetVault))),
+            attestation
+        );
+        if (!success) revert Errors.CCTPMessageFailed();
 
-        // Verify CCTP message
-        bool success = cctp.receiveMessage(sourceDomain, sender, message);
-        if (!success) revert Errors.InvalidMessage();
-
-        // Decode USDC amount from message
-        uint256 usdcAmount = abi.decode(message, (uint256));
-        if (usdcAmount < withdrawal.minUSDC) revert Errors.InsufficientUSDC();
-
-        // Mark CCTP as completed
+        withdrawal.status = DataTypes.CrossChainStatus.Completed;
         withdrawal.cctpCompleted = true;
-        withdrawal.usdcAmount = usdcAmount;
-        withdrawal.sharesWithdrawn = true;
 
-        // Transfer USDC to user
-        USDC.safeTransfer(withdrawal.user, usdcAmount);
-
-        emit WithdrawalCompleted(withdrawalId, withdrawal.user, usdcAmount);
+        emit WithdrawalCompleted(
+            withdrawalId,
+            withdrawal.user,
+            withdrawal.usdcAmount
+        );
     }
 
-    // Recovery function for stale withdrawals
     /**
-     * @notice Recovers tokens from a stale withdrawal
-     * @dev Returns uShares to user if withdrawal wasn't processed
-     * @param withdrawalId Unique identifier for the withdrawal
-     * @custom:requirements
-     * - Withdrawal must exist
-     * - Process timeout must have elapsed
-     * - Shares must not be already withdrawn
+     * @notice Mint new tokens
+     * @param to The address to mint tokens to
+     * @param amount The amount of tokens to mint
      */
-    function recoverStaleWithdrawal(bytes32 withdrawalId) external {
-        DataTypes.CrossChainWithdrawal storage withdrawal = withdrawals[withdrawalId];
-        if (withdrawal.user == address(0)) revert Errors.InvalidWithdrawal();
-        if (block.timestamp <= withdrawal.timestamp + PROCESS_TIMEOUT) revert Errors.InvalidWithdrawal();
-        if (withdrawal.sharesWithdrawn) revert Errors.WithdrawalProcessed();
-
-        // Return uShares to user since withdrawal failed
-        _mint(withdrawal.user, withdrawal.uSharesAmount);
-
-        delete withdrawals[withdrawalId];
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            RECOVERY FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Recovers USDC from a stale deposit
-     * @dev Returns USDC to user if CCTP wasn't completed
-     * @param depositId Unique identifier for the deposit
-     * @custom:requirements
-     * - Deposit must exist
-     * - Process timeout must have elapsed
-     * - Shares must not be already issued
-     */
-    function recoverStaleDeposit(bytes32 depositId) external {
-        DataTypes.CrossChainDeposit storage deposit = deposits[depositId];
-        if (deposit.user == address(0)) revert Errors.InvalidDeposit();
-        if (block.timestamp <= deposit.timestamp + PROCESS_TIMEOUT) revert Errors.InvalidDeposit();
-        if (deposit.sharesIssued) revert Errors.ActiveShares();
-
-        // Return USDC to user if CCTP hasn't completed
-        if (!deposit.cctpCompleted) {
-            USDC.safeTransfer(deposit.user, deposit.usdcAmount);
-        }
-
-        delete deposits[depositId];
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            CROSS-CHAIN TOKEN FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Mints new uShares tokens
-     * @dev Only callable by position manager
-     * @param to Address to mint tokens to
-     * @param amount Amount of tokens to mint
-     * @custom:requirements
-     * - Caller must be position manager
-     * - Amount must not exceed MAX_TRANSACTION_SIZE
-     */
-    function mint(address to, uint256 amount) external onlyPositionManager {
-        Errors.verifyAddress(to);
-        Errors.verifyNumber(amount);
-
-        // Check max transaction size
-        if (amount > MAX_TRANSACTION_SIZE) revert Errors.ExceedsMaxSize();
-
+    function mint(address to, uint256 amount) external onlyRoles(MINTER_ROLE) whenNotPaused {
         _mint(to, amount);
+        emit Minted(to, amount);
     }
 
     /**
-     * @notice Burns uShares tokens from caller
-     * @param amount Amount of tokens to burn
+     * @notice Burn tokens
+     * @param from The address to burn tokens from
+     * @param amount The amount of tokens to burn
      */
-    function burn(uint256 amount) external {
-        _burn(msg.sender, amount);
-    }
-
-    /**
-     * @notice Burns uShares tokens from specified address
-     * @dev Requires approval from token owner
-     * @param from Address to burn tokens from
-     * @param amount Amount of tokens to burn
-     * @custom:requirements
-     * - Caller must have sufficient allowance
-     */
-    function burnFrom(address from, uint256 amount) external {
-        if (allowance(from, msg.sender) < amount) revert Errors.InsufficientAllowance();
-        _spendAllowance(from, msg.sender, amount);
+    function burn(address from, uint256 amount) external onlyRoles(BURNER_ROLE) whenNotPaused {
         _burn(from, amount);
+        emit Burned(from, amount);
+    }
+
+    /**
+     * @notice Set the vault mapping for a chain and token pool
+     * @param destinationChain The destination chain ID
+     * @param _tokenPool The token pool address
+     * @param vault The vault address
+     */
+    function setVaultMapping(
+        uint32 destinationChain,
+        address _tokenPool,
+        address vault
+    ) external onlyRoles(ADMIN_ROLE) {
+        Errors.verifyChainId(destinationChain);
+        Errors.verifyAddress(_tokenPool);
+        Errors.verifyAddress(vault);
+
+        domainToVaultMapping[destinationChain][_tokenPool] = vault;
+        emit VaultMappingSet(destinationChain, _tokenPool, vault);
+    }
+
+    /**
+     * @notice Emergency function to recover stuck tokens
+     * @param token The token to recover
+     * @param to The address to send tokens to
+     * @param amount The amount to recover
+     */
+    function recoverTokens(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyRoles(ADMIN_ROLE) {
+        Errors.verifyAddress(to);
+        if (amount == 0) revert Errors.InvalidAmount();
+        
+        // Don't allow recovery of uShares tokens
+        if (token == address(this)) revert Errors.InvalidToken(token);
+        
+        token.safeTransfer(to, amount);
+        emit TokensRecovered(token, to, amount);
+    }
+
+    /**
+     * @notice Update transaction limits
+     * @param _minAmount New minimum amount
+     * @param _maxAmount New maximum amount
+     */
+    function updateLimits(
+        uint256 _minAmount,
+        uint256 _maxAmount
+    ) external onlyRoles(ADMIN_ROLE) {
+        if (_minAmount == 0 || _maxAmount == 0) revert Errors.InvalidAmount();
+        if (_minAmount >= _maxAmount) revert Errors.InvalidConfig();
+        
+        minAmount = _minAmount;
+        maxAmount = _maxAmount;
+        emit LimitsUpdated(_minAmount, _maxAmount);
+    }
+
+    /**
+     * @notice Update maximum allowed slippage
+     * @param _maxSlippage New maximum slippage (100 = 1%)
+     */
+    function updateMaxSlippage(uint256 _maxSlippage) external onlyRoles(ADMIN_ROLE) {
+        if (_maxSlippage == 0 || _maxSlippage > 10000) revert Errors.InvalidConfig();
+        
+        maxSlippage = _maxSlippage;
+        emit MaxSlippageUpdated(_maxSlippage);
+    }
+
+    /**
+     * @notice Set a remote token messenger for a domain
+     * @param domain The domain ID
+     * @param messenger The token messenger address as bytes32
+     */
+    function setRemoteTokenMessenger(uint32 domain, bytes32 messenger) external onlyRoles(ADMIN_ROLE) {
+        if (messenger == bytes32(0)) revert Errors.InvalidConfig();
+        remoteTokenMessengers[domain] = messenger;
+        emit RemoteTokenMessengerSet(domain, messenger);
+    }
+
+    /**
+     * @notice Remove a remote token messenger for a domain
+     * @param domain The domain ID
+     */
+    function removeRemoteTokenMessenger(uint32 domain) external onlyRoles(ADMIN_ROLE) {
+        delete remoteTokenMessengers[domain];
+        emit RemoteTokenMessengerRemoved(domain);
+    }
+
+    /**
+     * @notice Initiate a deposit with a specified caller on the destination chain
+     * @param targetVault The address of the vault on the destination chain
+     * @param usdcAmount The amount of USDC to deposit
+     * @param destinationDomain The destination domain ID
+     * @param minShares The minimum amount of shares to receive
+     * @param deadline The deadline for the deposit
+     * @param destinationCaller The allowed caller of receiveMessage on destination domain
+     * @return depositId The ID of the deposit
+     */
+    function initiateDepositWithCaller(
+        address targetVault,
+        uint256 usdcAmount,
+        uint32 destinationDomain,
+        uint256 minShares,
+        uint256 deadline,
+        bytes32 destinationCaller
+    ) external whenNotPaused returns (bytes32) {
+        // Verify destination chain and vault
+        if (!IVaultRegistry(vaultRegistry).isVaultActive(destinationDomain, targetVault)) revert Errors.VaultNotActive();
+
+        // Verify vault mapping
+        address expectedVault = domainToVaultMapping[destinationDomain][tokenPool];
+        if (expectedVault == address(0) || expectedVault != targetVault) revert Errors.InvalidVault();
+
+        // Check transaction size
+        if (usdcAmount < minAmount || usdcAmount > maxAmount) revert Errors.InvalidAmount();
+
+        // Check deadline
+        if (block.timestamp > deadline) revert Errors.InvalidDeadline();
+
+        // Check slippage
+        uint256 expectedShares = IVaultRegistry(vaultRegistry).calculateShares(destinationDomain, targetVault, usdcAmount);
+        uint256 maxSlippageAmount = (expectedShares * maxSlippage) / 10000;
+        if (expectedShares - minShares > maxSlippageAmount) revert Errors.ExcessiveSlippage();
+
+        // Transfer USDC from user
+        USDC.safeTransferFrom(msg.sender, address(this), usdcAmount);
+
+        // Generate deposit ID
+        bytes32 depositId = keccak256(
+            abi.encodePacked(
+                msg.sender,
+                destinationDomain,
+                targetVault,
+                usdcAmount,
+                minShares,
+                deadline,
+                block.timestamp
+            )
+        );
+
+        // Store deposit details
+        _deposits[depositId] = DataTypes.CrossChainDeposit({
+            user: msg.sender,
+            usdcAmount: usdcAmount,
+            destinationDomain: destinationDomain,
+            targetVault: targetVault,
+            deadline: deadline,
+            status: DataTypes.CrossChainStatus.Pending,
+            cctpCompleted: false
+        });
+
+        // Approve USDC for CCTP
+        USDC.safeApprove(cctp, usdcAmount);
+
+        // Initiate CCTP burn with caller
+        uint64 nonce = ICCTP(cctp).depositForBurnWithCaller(
+            usdcAmount,
+            destinationDomain,
+            bytes32(uint256(uint160(targetVault))),
+            USDC,
+            destinationCaller
+        );
+
+        emit DepositInitiated(depositId, msg.sender, usdcAmount, targetVault, destinationDomain, minShares, deadline);
+
+        return depositId;
+    }
+
+    /**
+     * @notice Set the token receiver contract
+     * @param _tokenReceiver The address of the token receiver contract
+     */
+    function setTokenReceiver(address _tokenReceiver) external onlyRoles(ADMIN_ROLE) {
+        Errors.verifyAddress(_tokenReceiver);
+        tokenReceiver = _tokenReceiver;
     }
 
     /*//////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Gets the token pool address
-     * @return address The token pool address
-     */
-    function getTokenPool() external view returns (address) {
-        return tokenPool;
+    function name() public pure override returns (string memory) {
+        return "UShares Token";
     }
 
-    /**
-     * @notice Gets deposit details by ID
-     * @param depositId Unique identifier for the deposit
-     * @return CrossChainDeposit Deposit details
-     */
-    function getDeposit(bytes32 depositId) external view returns (DataTypes.CrossChainDeposit memory) {
-        return deposits[depositId];
+    function symbol() public pure override returns (string memory) {
+        return "USH";
     }
 
-    /**
-     * @notice Gets withdrawal details by ID
-     * @param withdrawalId Unique identifier for the withdrawal
-     * @return CrossChainWithdrawal Withdrawal details
-     */
-    function getWithdrawal(bytes32 withdrawalId) external view returns (DataTypes.CrossChainWithdrawal memory) {
-        return withdrawals[withdrawalId];
+    function decimals() public pure override returns (uint8) {
+        return 6;
     }
-
-    /**
-     * @notice Gets the mapped vault address for a given chain and local vault
-     * @param targetChain Chain ID to query
-     * @param localVault Local vault address
-     * @return address The mapped remote vault address
-     */
-    function getVaultMapping(uint32 targetChain, address localVault) external view returns (address) {
-        return chainToVaultMapping[targetChain][localVault];
-    }
-
-    /**
-     * @notice Gets the CCTP contract address
-     * @return address The CCTP contract address
-     */
-    function getCCTPContract() external view returns (address) {
-        return address(cctp);
-    }
-
-    /**
-     * @notice Gets the chain ID where this contract is deployed
-     * @return uint32 The chain ID
-     */
-    function getChainId() external view returns (uint32) {
-        return chainId;
-    }
-
-    /**
-     * @notice Gets the CCIP admin address
-     * @return address The CCIP admin address (this contract)
-     */
-    function getCCIPAdmin() external view returns (address) {
-        return address(this); // The contract itself is the CCIP admin
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Configures a token pool's roles internally
-     * @dev Grants or revokes TOKEN_POOL_ROLE, MINTER_ROLE, and BURNER_ROLE
-     * @param pool Address to configure
-     * @param status True to grant roles, false to revoke
-     * @custom:emits TokenPoolConfigured, MinterConfigured, and BurnerConfigured events
-     */
-    function _configureTokenPool(address pool, bool status) internal {
-        Errors.verifyAddress(pool);
-        if (status) {
-            _grantRoles(pool, TOKEN_POOL_ROLE | MINTER_ROLE | BURNER_ROLE);
-        } else {
-            _removeRoles(pool, TOKEN_POOL_ROLE | MINTER_ROLE | BURNER_ROLE);
-        }
-        emit TokenPoolConfigured(pool, status);
-        emit MinterConfigured(pool, status);
-        emit BurnerConfigured(pool, status);
-    }
-
-    /**
-     * @notice Deposits USDC into a vault
-     * @dev Approves USDC for vault and performs deposit
-     * @param vault Address of the vault to deposit into
-     * @param amount Amount of USDC to deposit
-     * @param minShares Minimum shares expected from deposit
-     * @return shares Number of shares received from deposit
-     */
-    function depositToVault(
-        address vault,
-        uint256 amount,
-        uint256 minShares
-    ) internal returns (uint256 shares) {
-        // Approve USDC for vault
-        USDC.safeApprove(vault, amount);
-        
-        // Deposit into vault
-        shares = IVault(vault).deposit(amount, address(this));
-        
-        // Verify minimum shares
-        if (shares < minShares) revert Errors.InsufficientShares();
-        
-        return shares;
-    }
-
-    /**
-     * @notice Converts chain ID to CCTP domain
-     * @dev Maps common chain IDs to their corresponding CCTP domains
-     * @param _chainId Chain ID to convert
-     * @return uint32 Corresponding CCTP domain
-     */
-    function _getDestinationDomain(uint32 _chainId) internal pure returns (uint32) {
-        // If the chainId is already a CCTP domain, return it directly
-        if (_chainId <= 7) return _chainId;
-
-        // Otherwise, convert from chain ID to CCTP domain
-        if (_chainId == 1) return ETHEREUM_DOMAIN;
-        if (_chainId == 43114) return AVALANCHE_DOMAIN;
-        if (_chainId == 10) return OPTIMISM_DOMAIN;
-        if (_chainId == 42161) return ARBITRUM_DOMAIN;
-        if (_chainId == 8453) return BASE_DOMAIN;
-        if (_chainId == 137) return POLYGON_DOMAIN;
-        revert Errors.InvalidChain();
-    }
-
-    error InvalidMessage();
 }

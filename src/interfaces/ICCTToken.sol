@@ -1,9 +1,28 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {DataTypes} from "../types/DataTypes.sol";
+import {Pool} from "../libs/Pool.sol";
 
+/**
+ * @title ICCTToken
+ * @notice Interface for Chainlink's Cross-Chain Token (CCT) standard
+ */
 interface ICCTToken {
-    function lockOrBurn(DataTypes.LockOrBurnParams calldata params) external returns (bytes memory message);
-    function releaseOrMint(DataTypes.ReleaseOrMintParams calldata params) external returns (uint256);
+    /**
+     * @notice Lock or burn tokens for cross-chain transfer
+     * @param params Parameters for the lock/burn operation
+     * @return Pool.LockOrBurnOutV1 Data for the destination chain
+     */
+    function lockOrBurn(
+        Pool.LockOrBurnInV1 calldata params
+    ) external returns (Pool.LockOrBurnOutV1 memory);
+
+    /**
+     * @notice Release or mint tokens from cross-chain transfer
+     * @param params Parameters for the release/mint operation
+     * @return Pool.ReleaseOrMintOutV1 Data about the released/minted tokens
+     */
+    function releaseOrMint(
+        Pool.ReleaseOrMintInV1 calldata params
+    ) external returns (Pool.ReleaseOrMintOutV1 memory);
 }

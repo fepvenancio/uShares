@@ -4,6 +4,15 @@ pragma solidity 0.8.28;
 /// @title DataTypes
 /// @notice Core data structures for the cross-chain vault protocol
 library DataTypes {
+    // Enums
+    enum CrossChainStatus {
+        Pending,
+        CCTPCompleted,
+        SharesIssued,
+        Completed,
+        Failed
+    }
+
     // Cross-chain structures
     struct CrossChainDeposit {
         address user;
@@ -18,6 +27,7 @@ library DataTypes {
         uint256 timestamp;
         uint256 minShares;
         uint256 deadline;
+        CrossChainStatus status;
     }
 
     struct CrossChainWithdrawal {
@@ -32,6 +42,7 @@ library DataTypes {
         uint256 timestamp;
         uint256 minUSDC;
         uint256 deadline;
+        CrossChainStatus status;
     }
 
     // Vault structures
