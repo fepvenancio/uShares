@@ -9,7 +9,8 @@ import {IERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/IERC1155Re
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 
 import {ITokenReceiver} from "./interfaces/ITokenReceiver.sol";
 import {Errors} from "./libs/Errors.sol";
@@ -23,7 +24,8 @@ contract TokenReceiver is
     IERC721Receiver,
     IERC1155Receiver,
     Ownable2Step,
-    Pausable
+    Pausable,
+    IERC165
 {
     using SafeERC20 for IERC20;
 
@@ -47,8 +49,8 @@ contract TokenReceiver is
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor() {
-        _initializeOwner(msg.sender);
+    constructor(address initialOwner) Ownable2Step() {
+        _transferOwnership(initialOwner);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -198,9 +200,10 @@ contract TokenReceiver is
      */
     function supportsInterface(
         bytes4 interfaceId
-    ) external pure override returns (bool supported) {
+    ) external pure override(IERC165, ITokenReceiver) returns (bool supported) {
         return
             interfaceId == type(IERC721Receiver).interfaceId ||
-            interfaceId == type(IERC1155Receiver).interfaceId;
+            interfaceId == type(IERC1155Receiver).interfaceId ||
+            interfaceId == type(ITokenReceiver).interfaceId;
     }
 } 

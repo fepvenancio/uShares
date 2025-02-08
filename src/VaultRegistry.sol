@@ -54,6 +54,9 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
     /// @notice Mapping of domain to token pool
     mapping(uint32 => address) public domainToTokenPool;
 
+    /// @notice Mapping of vault key to pending USDC amount
+    mapping(bytes32 => uint256) public pendingUSDC;
+
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
     //////////////////////////////////////////////////////////////*/

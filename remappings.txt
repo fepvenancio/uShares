@@ -1,10 +1,10 @@
 @memview-sol/=lib/evm-cctp-contracts/lib/memview-sol/
-@openzeppelin/=lib/evm-cctp-contracts/lib/openzeppelin-contracts/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 centre-tokens.git/=lib/evm-cctp-contracts/lib/centre-tokens.git/
 chainlink/=lib/chainlink/
 ds-test/=lib/evm-cctp-contracts/lib/ds-test/src/
 evm-cctp-contracts/=lib/evm-cctp-contracts/
 forge-std/=lib/forge-std/src/
 memview-sol/=lib/evm-cctp-contracts/lib/memview-sol/contracts/
-openzeppelin-contracts/=lib/evm-cctp-contracts/lib/openzeppelin-contracts/contracts/
+openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/
 solady/=lib/solady/src/

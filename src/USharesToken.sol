@@ -109,6 +109,28 @@ contract USharesToken is IUSharesToken, ERC20, OwnableRoles {
     address public tokenReceiver;
 
     /*//////////////////////////////////////////////////////////////
+                            MISSING FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Get the chain ID
+     * @return The chain ID
+     */
+    function chainId() external view returns (uint32) {
+        return domain;
+    }
+
+    /**
+     * @notice Get the vault mapping for a chain and local vault
+     * @param chainId The chain ID
+     * @param localVault The local vault address
+     * @return The mapped vault address
+     */
+    function chainToVaultMapping(uint32 chainId, address localVault) external view returns (address) {
+        return domainToVaultMapping[chainId][localVault];
+    }
+
+    /*//////////////////////////////////////////////////////////////
                                MODIFIERS
     //////////////////////////////////////////////////////////////*/
 
@@ -512,22 +534,22 @@ contract USharesToken is IUSharesToken, ERC20, OwnableRoles {
 
     /**
      * @notice Set a remote token messenger for a domain
-     * @param domain The domain ID
+     * @param domainId The domain ID
      * @param messenger The token messenger address as bytes32
      */
-    function setRemoteTokenMessenger(uint32 domain, bytes32 messenger) external onlyRoles(ADMIN_ROLE) {
+    function setRemoteTokenMessenger(uint32 domainId, bytes32 messenger) external onlyRoles(ADMIN_ROLE) {
         if (messenger == bytes32(0)) revert Errors.InvalidConfig();
-        remoteTokenMessengers[domain] = messenger;
-        emit RemoteTokenMessengerSet(domain, messenger);
+        remoteTokenMessengers[domainId] = messenger;
+        emit RemoteTokenMessengerSet(domainId, messenger);
     }
 
     /**
      * @notice Remove a remote token messenger for a domain
-     * @param domain The domain ID
+     * @param domainId The domain ID
      */
-    function removeRemoteTokenMessenger(uint32 domain) external onlyRoles(ADMIN_ROLE) {
-        delete remoteTokenMessengers[domain];
-        emit RemoteTokenMessengerRemoved(domain);
+    function removeRemoteTokenMessenger(uint32 domainId) external onlyRoles(ADMIN_ROLE) {
+        delete remoteTokenMessengers[domainId];
+        emit RemoteTokenMessengerRemoved(domainId);
     }
 
     /**

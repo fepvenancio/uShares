@@ -197,7 +197,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @param sourceChain Source domain ID
      * @return Array of position keys
      */
-    function getDomainPositions(uint32 sourceChain) external view returns (bytes32[] memory) {
+    function getChainPositions(uint32 sourceChain) external view returns (bytes32[] memory) {
         return domainPositions[sourceChain];
     }
 
@@ -224,7 +224,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @param sourceChain Source domain ID
      * @return uint256 Number of positions
      */
-    function getDomainPositionCount(uint32 sourceChain) external view returns (uint256) {
+    function getChainPositionCount(uint32 sourceChain) external view returns (uint256) {
         return domainPositions[sourceChain].length;
     }
 
