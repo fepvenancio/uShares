@@ -40,11 +40,7 @@ interface IPositionManager {
 
     function getUserPositions(address user) external view returns (bytes32[] memory);
 
-    function getChainPositions(uint32 chainId) external view returns (bytes32[] memory);
-
     function isPositionActive(bytes32 positionKey) external view returns (bool);
-
-    function getChainPositionCount(uint32 sourceChain) external view returns (uint256);
 
     function getUserPositionCount(address user) external view returns (uint256);
 

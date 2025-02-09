@@ -2,8 +2,23 @@
 pragma solidity 0.8.28;
 
 import {DataTypes} from "../libs/DataTypes.sol";
+import {RateLimiter} from "../libs/RateLimiter.sol";
 
 interface IVaultRegistry {
+    event VaultRegistered(uint32 indexed domain, address indexed vault);
+    event VaultUpdated(
+        uint32 indexed domain,
+        address indexed vault,
+        bool active
+    );
+    event VaultRemoved(uint32 indexed domain, address indexed vault);
+    event RateLimitConfigured(
+        uint32 indexed domain,
+        address indexed vault,
+        RateLimiter.Config config
+    );
+    event TokenPoolConfigured(uint32 indexed domain, address indexed tokenPool);
+
     /**
      * @notice Register a new vault
      * @param domain The domain ID
@@ -17,7 +32,11 @@ interface IVaultRegistry {
      * @param vault The vault address
      * @param active Whether the vault is active
      */
-    function updateVaultStatus(uint32 domain, address vault, bool active) external;
+    function updateVaultStatus(
+        uint32 domain,
+        address vault,
+        bool active
+    ) external;
 
     /**
      * @notice Remove a vault
@@ -32,40 +51,10 @@ interface IVaultRegistry {
      * @param vault The vault address
      * @return The vault information
      */
-    function getVaultInfo(uint32 domain, address vault) external view returns (DataTypes.VaultInfo memory);
-
-    /**
-     * @notice Get all vaults for a domain
-     * @param domain The domain ID
-     * @return Array of vault addresses
-     */
-    function getChainVaults(uint32 domain) external view returns (address[] memory);
-
-    /**
-     * @notice Calculate the number of shares for a given USDC amount
-     * @param domain The domain ID
-     * @param vault The vault address
-     * @param usdcAmount The amount of USDC
-     * @return The number of shares
-     */
-    function calculateShares(
+    function getVaultInfo(
         uint32 domain,
-        address vault,
-        uint256 usdcAmount
-    ) external view returns (uint256);
-
-    /**
-     * @notice Update the shares for a vault
-     * @param domain The domain ID
-     * @param vault The vault address
-     * @param shares The new share amount
-     * @return The updated share amount
-     */
-    function updateVaultShares(
-        uint32 domain,
-        address vault,
-        uint256 shares
-    ) external returns (uint256);
+        address vault
+    ) external view returns (DataTypes.VaultInfo memory);
 
     /**
      * @notice Check if a vault is active
@@ -73,5 +62,10 @@ interface IVaultRegistry {
      * @param vault The vault address
      * @return Whether the vault is active
      */
-    function isVaultActive(uint32 domain, address vault) external view returns (bool);
+    function isVaultActive(
+        uint32 domain,
+        address vault
+    ) external view returns (bool);
+
+    function configureTokenPool(uint32 domain, address tokenPool) external;
 }

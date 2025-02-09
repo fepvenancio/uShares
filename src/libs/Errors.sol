@@ -62,6 +62,8 @@ library Errors {
                             STATE ERRORS
     //////////////////////////////////////////////////////////////*/
 
+    error NotUSDC();
+
     /// @notice Thrown when vault is not active
     error VaultNotActive();
     /// @notice Thrown when vault is active but should not be
@@ -180,5 +182,9 @@ library Errors {
      */
     function verifyChainId(uint32 chainId) internal pure {
         if (chainId == 0) revert ZeroChainId();
+    }
+
+    function verifyIfActive(bool isActive) internal pure {
+        if (!isActive) revert VaultNotActive();
     }
 }

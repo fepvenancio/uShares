@@ -2,8 +2,6 @@
 pragma solidity 0.8.28;
 
 import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
-import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
-import {ERC20} from "solady/tokens/ERC20.sol";
 import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
 import {IPositionManager} from "./interfaces/IPositionManager.sol";
 import {KeyManager} from "./libs/KeyManager.sol";
@@ -17,7 +15,6 @@ import {DataTypes} from "./types/DataTypes.sol";
  * @custom:security-contact security@ushares.com
  */
 contract PositionManager is IPositionManager, OwnableRoles {
-    using SafeTransferLib for ERC20;
     using KeyManager for *;
 
     /*//////////////////////////////////////////////////////////////
@@ -29,9 +26,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
     
     /// @notice Role identifier for handler operations (creating/updating positions)
     uint256 public constant HANDLER_ROLE = _ROLE_1;
-
-    /// @notice Role identifier for token pool operations
-    uint256 public constant TOKEN_POOL_ROLE = _ROLE_2;
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
@@ -50,17 +44,8 @@ contract PositionManager is IPositionManager, OwnableRoles {
     /// @notice Mapping of user addresses to their position keys
     mapping(address => bytes32[]) public userPositions;
 
-    /// @notice Mapping of source domains to position keys originating from that domain
-    mapping(uint32 => bytes32[]) public domainPositions;
-
     /// @notice Mapping of domain ID to token pool address
     mapping(uint32 => address) public domainTokenPools;
-
-    /// @notice Mapping of token pool to domain ID
-    mapping(address => uint32) public tokenPoolDomains;
-
-    /// @notice Mapping of position keys to their last sync timestamp
-    mapping(bytes32 => uint256) public lastPositionSync;
 
     /*//////////////////////////////////////////////////////////////
                                 MODIFIERS
@@ -80,9 +65,12 @@ contract PositionManager is IPositionManager, OwnableRoles {
     /// @param _vaultRegistry Address of the vault registry contract
     constructor(address _vaultRegistry) {
         Errors.verifyAddress(_vaultRegistry);
+        
         vaultRegistry = IVaultRegistry(_vaultRegistry);
+        
         _initializeOwner(msg.sender);
-        _grantRoles(msg.sender, ADMIN_ROLE | HANDLER_ROLE | TOKEN_POOL_ROLE);
+        _grantRoles(msg.sender, ADMIN_ROLE);
+        _grantRoles(address(this), HANDLER_ROLE);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -136,7 +124,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
 
         // Update tracking
         userPositions[user].push(positionKey);
-        domainPositions[sourceChain].push(positionKey);
 
         emit PositionCreated(user, sourceChain, destinationChain, vault, shares);
     }
@@ -193,15 +180,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
     }
 
     /**
-     * @notice Gets all position keys for a source domain
-     * @param sourceChain Source domain ID
-     * @return Array of position keys
-     */
-    function getChainPositions(uint32 sourceChain) external view returns (bytes32[] memory) {
-        return domainPositions[sourceChain];
-    }
-
-    /**
      * @notice Checks if a position exists and is active
      * @param positionKey Position identifier
      * @return bool Position status
@@ -217,15 +195,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
      */
     function getUserPositionCount(address user) external view returns (uint256) {
         return userPositions[user].length;
-    }
-
-    /**
-     * @notice Gets total positions for a domain
-     * @param sourceChain Source domain ID
-     * @return uint256 Number of positions
-     */
-    function getChainPositionCount(uint32 sourceChain) external view returns (uint256) {
-        return domainPositions[sourceChain].length;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -250,14 +219,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
      */
     function revokeRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
         _removeRoles(user, roles);
-    }
-
-    /**
-     * @notice Allows a user to renounce their own roles
-     * @param roles Roles to renounce
-     */
-    function renounceRoles(uint256 roles) public payable virtual override {
-        _removeRoles(msg.sender, roles);
     }
 
     /**
@@ -319,74 +280,4 @@ contract PositionManager is IPositionManager, OwnableRoles {
     {
         return KeyManager.getPositionKey(owner, sourceChain, destinationChain, destinationVault);
     }
-
-    /**
-     * @notice Configures a token pool for a specific domain
-     * @param domainId Domain ID for the token pool
-     * @param tokenPool Address of the token pool
-     */
-    function configureTokenPool(uint32 domainId, address tokenPool) external onlyRoles(ADMIN_ROLE) {
-        Errors.verifyChainId(domainId);
-        Errors.verifyAddress(tokenPool);
-
-        // Remove old token pool if exists
-        address oldPool = domainTokenPools[domainId];
-        if (oldPool != address(0)) {
-            delete tokenPoolDomains[oldPool];
-            _removeRoles(oldPool, TOKEN_POOL_ROLE);
-        }
-
-        // Configure new token pool
-        domainTokenPools[domainId] = tokenPool;
-        tokenPoolDomains[tokenPool] = domainId;
-        _grantRoles(tokenPool, TOKEN_POOL_ROLE);
-
-        emit TokenPoolConfigured(domainId, tokenPool);
-    }
-
-    /**
-     * @notice Syncs a position's state with the token pool
-     * @param positionKey Position key to sync
-     * @param shares New share amount from token pool
-     */
-    function syncPosition(bytes32 positionKey, uint256 shares) external {
-        // Verify caller is token pool for position's domain
-        uint32 domainId = positions[positionKey].destinationChain;
-        if (msg.sender != domainTokenPools[domainId]) revert Errors.NotTokenPool();
-
-        // Update position
-        positions[positionKey].shares = shares;
-        positions[positionKey].timestamp = uint64(block.timestamp);
-        lastPositionSync[positionKey] = block.timestamp;
-
-        emit PositionSynced(positionKey, shares, block.timestamp);
-    }
-
-    /**
-     * @notice Validates a position update from a token pool
-     * @param positionKey Position key to validate
-     * @param shares New share amount
-     * @return bool Whether the update is valid
-     */
-    function validatePositionUpdate(bytes32 positionKey, uint256 shares) public view returns (bool) {
-        DataTypes.Position memory position = positions[positionKey];
-        if (!position.active) return false;
-
-        // Check if caller is token pool for position's domain
-        if (msg.sender != domainTokenPools[position.destinationChain]) return false;
-
-        // Validate vault is still active
-        if (!vaultRegistry.isVaultActive(position.destinationChain, position.destinationVault)) {
-            return false;
-        }
-
-        // Validate share amount
-        if (shares > type(uint96).max) return false;
-
-        return true;
-    }
-
-    // Events
-    event TokenPoolConfigured(uint32 indexed domainId, address tokenPool);
-    event PositionSynced(bytes32 indexed positionKey, uint256 shares, uint256 timestamp);
 }

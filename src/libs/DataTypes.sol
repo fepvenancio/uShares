@@ -12,7 +12,6 @@ library DataTypes {
     struct VaultInfo {
         address vaultAddress;
         uint32 domain;
-        uint96 totalShares;
         uint64 lastUpdate;
         bool isActive;
     }

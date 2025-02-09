@@ -10,15 +10,6 @@ import {Errors} from "./Errors.sol";
  * @custom:security-contact security@ushares.com
  */
 library KeyManager {
-    /*//////////////////////////////////////////////////////////////
-                                ERRORS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Thrown when a key has an invalid length
-    error InvalidKeyLength();
-
-    /// @notice Thrown when an address parameter is invalid
-    error InvalidAddress();
 
     /*//////////////////////////////////////////////////////////////
                             KEY GENERATION
@@ -33,17 +24,26 @@ library KeyManager {
      * @param destinationVault Destination vault address
      * @return bytes32 Unique position identifier
      */
-    function getPositionKey(address owner, uint32 sourceChain, uint32 destinationChain, address destinationVault)
-        internal
-        pure
-        returns (bytes32)
-    {
-        if (owner == address(0)) revert InvalidAddress();
-        if (sourceChain == 0) revert Errors.ZeroChainId();
-        if (destinationChain == 0) revert Errors.ZeroChainId();
-        if (destinationVault == address(0)) revert InvalidAddress();
+    function getPositionKey(
+        address owner,
+        uint32 sourceChain,
+        uint32 destinationChain,
+        address destinationVault
+    ) internal pure returns (bytes32) {
+        Errors.verifyAddress(owner);
+        Errors.verifyNumber(sourceChain);
+        Errors.verifyNumber(destinationChain);
+        Errors.verifyAddress(destinationVault);
 
-        return keccak256(abi.encode(owner, sourceChain, destinationChain, destinationVault));
+        return
+            keccak256(
+                abi.encode(
+                    owner,
+                    sourceChain,
+                    destinationChain,
+                    destinationVault
+                )
+            );
     }
 
     /**
@@ -53,9 +53,12 @@ library KeyManager {
      * @param vault Vault address
      * @return bytes32 Unique vault identifier
      */
-    function getVaultKey(uint32 chainId, address vault) internal pure returns (bytes32) {
-        if (chainId == 0) revert Errors.ZeroChainId();
-        if (vault == address(0)) revert InvalidAddress();
+    function getVaultKey(
+        uint32 chainId,
+        address vault
+    ) internal pure returns (bytes32) {
+        Errors.verifyNumber(chainId);
+        Errors.verifyAddress(vault);
 
         return keccak256(abi.encode(chainId, vault));
     }
@@ -65,24 +68,45 @@ library KeyManager {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Validates a position key format
-     * @dev Currently only checks for non-zero value
-     * @param key Key to validate
+     * @notice Validates if a position key matches the data provided
+     * @dev Compares the provided key with the generated key
+     * @param keyToValidate Key to validate
+     * @param owner Position owner address
+     * @param sourceChain Source chain ID
+     * @param destinationChain Destination chain ID
+     * @param destinationVault Destination vault address
      * @return bool True if key is valid
      */
-    function isValidPositionKey(bytes32 key) internal pure returns (bool) {
-        // Add validation logic based on your key structure
-        return key != bytes32(0);
+    function isValidPositionKey(
+        bytes32 keyToValidate,
+        address owner,
+        uint32 sourceChain,
+        uint32 destinationChain,
+        address destinationVault
+    ) internal pure returns (bool) {
+        bytes32 key = getPositionKey(
+            owner,
+            sourceChain,
+            destinationChain,
+            destinationVault
+        );
+        return keyToValidate == key;
     }
 
     /**
-     * @notice Validates a vault key format
+     * @notice Validates if a vault key matches the data provided
      * @dev Currently only checks for non-zero value
      * @param key Key to validate
+     * @param chainId Chain ID where vault exists
+     * @param vault Vault address
      * @return bool True if key is valid
      */
-    function isValidVaultKey(bytes32 key) internal pure returns (bool) {
-        // Add validation logic based on your key structure
-        return key != bytes32(0);
+    function isValidVaultKey(
+        bytes32 key,
+        uint32 chainId,
+        address vault
+    ) internal pure returns (bool) {
+        bytes32 expectedKey = getVaultKey(chainId, vault);
+        return key == expectedKey;
     }
 }
