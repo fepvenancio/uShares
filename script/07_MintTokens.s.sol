@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.28;
+
+import {Script, console} from "forge-std/Script.sol";
+import {BurnMintERC677} from "chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
+import {AddressBook} from "./utils/AddressBook.sol";
+
+contract MintTokens is Script {
+    address tokenAddress;
+
+    function run() external {
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+
+        if (block.chainid == AddressBook.OPTIMISM) {
+            tokenAddress = AddressBook.OP_USharesToken;
+        } else if (block.chainid == AddressBook.BASE) {
+            tokenAddress = AddressBook.BASE_USharesToken;
+        } else {
+            revert("Unsupported chain ID");
+        }        
+
+        uint256 amount = 1000000000; 
+        // Use the sender's address as the receiver of the minted tokens
+        address receiverAddress = AddressBook.DEPLOYER_ADDRESS;
+
+        require(tokenAddress != address(0), "Invalid token address");
+        require(amount > 0, "Invalid amount to mint");
+
+        vm.startBroadcast(deployerPrivateKey);
+
+        // Instantiate the token contract at the retrieved address
+        BurnMintERC677 tokenContract = BurnMintERC677(tokenAddress);
+
+        // Mint the specified amount of tokens to the receiver address
+        console.log("Minting", amount, "tokens to", receiverAddress);
+        tokenContract.mint(receiverAddress, amount);
+
+        console.log("Waiting for confirmations...");
+
+        vm.stopBroadcast();
+
+        console.log("Minted", amount, "tokens to", receiverAddress);
+        console.log("Current balance of receiver is", tokenContract.balanceOf(receiverAddress), tokenContract.symbol());
+    }
+}
