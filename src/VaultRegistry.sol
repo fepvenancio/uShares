@@ -3,11 +3,11 @@ pragma solidity 0.8.28;
 
 import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
 import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
-import {DataTypes} from "./libs/DataTypes.sol";
-import {Errors} from "./libs/Errors.sol";
-import {KeyManager} from "./libs/KeyManager.sol";
-import {VaultLib} from "./libs/VaultLib.sol";
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {DataTypes} from "./libraries/DataTypes.sol";
+import {Errors} from "./libraries/Errors.sol";
+import {KeyManager} from "./libraries/KeyManager.sol";
+import {VaultLib} from "./libraries/VaultLib.sol";
+import {IERC4626} from "openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
 /**
  * @title VaultRegistry

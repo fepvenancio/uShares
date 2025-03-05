@@ -4,9 +4,9 @@ pragma solidity 0.8.28;
 import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
 import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
 import {IPositionManager} from "./interfaces/IPositionManager.sol";
-import {KeyManager} from "./libs/KeyManager.sol";
-import {Errors} from "./libs/Errors.sol";
-import {DataTypes} from "./types/DataTypes.sol";
+import {KeyManager} from "./libraries/KeyManager.sol";
+import {Errors} from "./libraries/Errors.sol";
+import {DataTypes} from "./libraries/DataTypes.sol";
 
 /**
  * @title PositionManager
@@ -143,7 +143,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
 
         // Update shares
         position.shares = shares;
-        position.timestamp = block.timestamp;
+        position.timestamp = uint64(block.timestamp);
 
         emit PositionUpdated(positionKey, shares, block.timestamp);
     }
@@ -161,7 +161,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
         // Deactivate position
         position.active = false;
         position.shares = 0;
-        position.timestamp = block.timestamp;
+        position.timestamp = uint64(block.timestamp);
 
         emit PositionClosed(positionKey);
     }

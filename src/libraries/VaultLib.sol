@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Errors} from "./Errors.sol";
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {IERC4626} from "openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
 library VaultLib {
     function convertToAssets(

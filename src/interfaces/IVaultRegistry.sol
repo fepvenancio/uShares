@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {DataTypes} from "../libs/DataTypes.sol";
-import {RateLimiter} from "../libs/RateLimiter.sol";
+import {DataTypes} from "../libraries/DataTypes.sol";
 
 interface IVaultRegistry {
     event VaultRegistered(uint32 indexed domain, address indexed vault);
@@ -12,11 +11,6 @@ interface IVaultRegistry {
         bool active
     );
     event VaultRemoved(uint32 indexed domain, address indexed vault);
-    event RateLimitConfigured(
-        uint32 indexed domain,
-        address indexed vault,
-        RateLimiter.Config config
-    );
     event TokenPoolConfigured(uint32 indexed domain, address indexed tokenPool);
 
     /**

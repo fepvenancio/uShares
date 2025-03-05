@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {BurnMintERC677} from "chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
-import {Errors} from "./libs/Errors.sol";
+import {Errors} from "./libraries/Errors.sol";
 
 /**
  * @title USharesToken
