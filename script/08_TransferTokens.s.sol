@@ -36,7 +36,7 @@ contract TransferTokens is Script {
 
         // Fetch the network configuration for the current chain
         Config helperConfig = new Config();
-        (, address router,,,, address link,,) = helperConfig.activeNetworkConfig();
+        (, address router,,,,,,) = helperConfig.activeNetworkConfig();
 
         require(tokenAddress != address(0), "Invalid token address");
         require(amount > 0, "Invalid amount to transfer");

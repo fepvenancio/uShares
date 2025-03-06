@@ -7,9 +7,3 @@
 [submodule "lib/chainlink"]
 	path = lib/chainlink
 	url = https://github.com/smartcontractkit/chainlink
-[submodule "lib/evm-cctp-contracts"]
-	path = lib/evm-cctp-contracts
-	url = https://github.com/circlefin/evm-cctp-contracts
-[submodule "lib/openzeppelin-contracts"]
-	path = lib/openzeppelin-contracts
-	url = https://github.com/OpenZeppelin/openzeppelin-contracts

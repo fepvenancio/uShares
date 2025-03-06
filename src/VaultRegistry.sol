@@ -7,7 +7,7 @@ import {DataTypes} from "./libraries/DataTypes.sol";
 import {Errors} from "./libraries/Errors.sol";
 import {KeyManager} from "./libraries/KeyManager.sol";
 import {VaultLib} from "./libraries/VaultLib.sol";
-import {IERC4626} from "openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import {IERC4626} from "./interfaces/IERC4626.sol";
 
 /**
  * @title VaultRegistry
