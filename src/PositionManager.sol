@@ -2,13 +2,11 @@
 pragma solidity 0.8.28;
 
 import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
-import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
-import {ERC20} from "solady/tokens/ERC20.sol";
 import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
 import {IPositionManager} from "./interfaces/IPositionManager.sol";
-import {KeyManager} from "./libs/KeyManager.sol";
-import {Errors} from "./libs/Errors.sol";
-import {DataTypes} from "./types/DataTypes.sol";
+import {KeyManager} from "./libraries/KeyManager.sol";
+import {Errors} from "./libraries/Errors.sol";
+import {DataTypes} from "./libraries/DataTypes.sol";
 
 /**
  * @title PositionManager
@@ -17,7 +15,6 @@ import {DataTypes} from "./types/DataTypes.sol";
  * @custom:security-contact security@ushares.com
  */
 contract PositionManager is IPositionManager, OwnableRoles {
-    using SafeTransferLib for ERC20;
     using KeyManager for *;
 
     /*//////////////////////////////////////////////////////////////
@@ -47,8 +44,8 @@ contract PositionManager is IPositionManager, OwnableRoles {
     /// @notice Mapping of user addresses to their position keys
     mapping(address => bytes32[]) public userPositions;
 
-    /// @notice Mapping of source chain IDs to position keys originating from that chain
-    mapping(uint32 => bytes32[]) public chainPositions;
+    /// @notice Mapping of domain ID to token pool address
+    mapping(uint32 => address) public domainTokenPools;
 
     /*//////////////////////////////////////////////////////////////
                                 MODIFIERS
@@ -68,9 +65,12 @@ contract PositionManager is IPositionManager, OwnableRoles {
     /// @param _vaultRegistry Address of the vault registry contract
     constructor(address _vaultRegistry) {
         Errors.verifyAddress(_vaultRegistry);
+        
         vaultRegistry = IVaultRegistry(_vaultRegistry);
+        
         _initializeOwner(msg.sender);
-        _grantRoles(msg.sender, ADMIN_ROLE | HANDLER_ROLE);
+        _grantRoles(msg.sender, ADMIN_ROLE);
+        _grantRoles(address(this), HANDLER_ROLE);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -124,7 +124,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
 
         // Update tracking
         userPositions[user].push(positionKey);
-        chainPositions[sourceChain].push(positionKey);
 
         emit PositionCreated(user, sourceChain, destinationChain, vault, shares);
     }
@@ -144,7 +143,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
 
         // Update shares
         position.shares = shares;
-        position.timestamp = block.timestamp;
+        position.timestamp = uint64(block.timestamp);
 
         emit PositionUpdated(positionKey, shares, block.timestamp);
     }
@@ -162,7 +161,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
         // Deactivate position
         position.active = false;
         position.shares = 0;
-        position.timestamp = block.timestamp;
+        position.timestamp = uint64(block.timestamp);
 
         emit PositionClosed(positionKey);
     }
@@ -181,15 +180,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
     }
 
     /**
-     * @notice Gets all position keys for a source chain
-     * @param sourceChain Source chain ID
-     * @return Array of position keys
-     */
-    function getChainPositions(uint32 sourceChain) external view returns (bytes32[] memory) {
-        return chainPositions[sourceChain];
-    }
-
-    /**
      * @notice Checks if a position exists and is active
      * @param positionKey Position identifier
      * @return bool Position status
@@ -205,15 +195,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
      */
     function getUserPositionCount(address user) external view returns (uint256) {
         return userPositions[user].length;
-    }
-
-    /**
-     * @notice Gets total positions for a chain
-     * @param sourceChain Chain ID
-     * @return uint256 Number of positions
-     */
-    function getChainPositionCount(uint32 sourceChain) external view returns (uint256) {
-        return chainPositions[sourceChain].length;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -238,14 +219,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
      */
     function revokeRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
         _removeRoles(user, roles);
-    }
-
-    /**
-     * @notice Allows a user to renounce their own roles
-     * @param roles Roles to renounce
-     */
-    function renounceRoles(uint256 roles) public payable virtual override {
-        _removeRoles(msg.sender, roles);
     }
 
     /**
@@ -295,8 +268,8 @@ contract PositionManager is IPositionManager, OwnableRoles {
     /**
      * @notice Generates a position key from components
      * @param owner Position owner address
-     * @param sourceChain Source chain ID
-     * @param destinationChain Destination chain ID
+     * @param sourceChain Source domain ID
+     * @param destinationChain Destination domain ID
      * @param destinationVault Destination vault address
      * @return bytes32 Generated position key
      */
