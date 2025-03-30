@@ -71,4 +71,23 @@ library DataTypes {
         bool active;
         uint64 timestamp;
     }
+
+    struct PendingDeposit {
+        address user;
+        uint32 sourceChain;
+        address vault;
+        uint256 amount;
+        uint256 minSharesExpected;
+        uint64 timestamp;
+    }
+
+    struct PendingWithdrawal {
+        address user;
+        uint32 sourceChain;
+        uint32 destinationChain;
+        address vault;
+        uint256 shares;
+        uint256 minUsdcExpected;
+        uint64 timestamp;
+    }
 } 
