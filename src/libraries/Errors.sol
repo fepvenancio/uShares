@@ -14,20 +14,12 @@ library Errors {
 
     /// @notice Thrown when caller is not the owner
     error NotOwner();
-    /// @notice Thrown when caller is not a minter
-    error NotMinter();
-    /// @notice Thrown when caller is not a burner
-    error NotBurner();
-    /// @notice Thrown when caller is not a token pool
-    error NotTokenPool();
-    /// @notice Thrown when caller is not the position manager
-    error NotPositionManager();
-    /// @notice Thrown when caller is not a CCIP admin
-    error NotCCIPAdmin();
     /// @notice Thrown when caller is not a handler
     error NotHandler();
     /// @notice Thrown when caller is not authorized
     error Unauthorized();
+    /// @notice Thrown when caller is not a bridge
+    error NotBridge();
 
     /*//////////////////////////////////////////////////////////////
                             INPUT VALIDATION ERRORS
@@ -45,99 +37,55 @@ library Errors {
     error InvalidAmount();
     /// @notice Thrown when a configuration is invalid
     error InvalidConfig();
-    /// @notice Thrown when a chain ID is invalid
-    error InvalidChain();
     /// @notice Thrown when a vault address is invalid
     error InvalidVault();
     /// @notice Thrown when a deposit ID is invalid
     error InvalidDeposit();
     /// @notice Thrown when a withdrawal ID is invalid
     error InvalidWithdrawal();
-    /// @notice Thrown when a destination is invalid
-    error InvalidDestination();
-    /// @notice Thrown when an asset address is invalid
-    error InvalidAsset();
     /// @notice Thrown when the balance is lower than amount
     error InsufficientBalance();
+    /// @notice Thrown when a fee is invalid
+    error InvalidFee();
+    /// @notice Thrown when a source chain is invalid
+    error InvalidSource();
+
     /*//////////////////////////////////////////////////////////////
                             STATE ERRORS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Thrown when a deadline is too far in the future
+    error DeadlineTooFar();
+    /// @notice Thrown when a deadline has expired
+    error DeadlineExpired();
+    /// @notice Thrown when a deadline has passed
+    error InvalidDeadline();
+    /// @notice Thrown when a token is not USDC
     error NotUSDC();
-
     /// @notice Thrown when vault is not active
     error VaultNotActive();
     /// @notice Thrown when vault is active but should not be
     error VaultActive();
-    /// @notice Thrown when vault already exists
-    error VaultExists();
-    /// @notice Thrown when vault is not found
-    error VaultNotFound();
     /// @notice Thrown when contract is paused
     error Paused();
-    /// @notice Thrown when CCTP transfer is already completed
-    error CCTPAlreadyCompleted();
     /// @notice Thrown when deposit has expired
     error DepositExpired();
     /// @notice Thrown when position already exists
     error PositionExists();
     /// @notice Thrown when position is not found
     error PositionNotFound();
-    /// @notice Thrown when shares are already active
-    error ActiveShares();
     /// @notice Thrown when shares are insufficient
     error InsufficientShares();
     /// @notice Thrown when allowance is insufficient
     error InsufficientAllowance();
-    /// @notice Thrown when message is duplicate
-    error DuplicateMessage();
-    /// @notice Thrown when transaction size exceeds maximum
-    error ExceedsMaxSize();
-    /// @notice Thrown when share price change is suspicious
-    error SuspiciousSharePriceChange();
-    /// @notice Thrown when message is invalid
-    error InvalidMessage();
     /// @notice Thrown when withdrawal has expired
     error WithdrawalExpired();
     /// @notice Thrown when USDC amount is insufficient
     error InsufficientUSDC();
-    /// @notice Thrown when withdrawal is already processed
-    error WithdrawalProcessed();
     /// @notice Thrown when rate limit is exceeded
     error RateLimitExceeded(address token, uint256 requested, uint256 available);
-
-    /// @notice Thrown when CCTP message processing fails
-    error CCTPMessageFailed();
-
-    /// @notice Thrown when a deadline has passed
-    error InvalidDeadline();
-
-    /// @notice Thrown when a token is not supported
-    error InvalidToken(address token);
-
-    /// @notice Thrown when a chain is not supported
-    error ChainNotAllowed(uint64 chainSelector);
-
-    /// @notice Thrown when a chain already exists
-    error ChainAlreadyExists(uint64 chainSelector);
-
-    /// @notice Thrown when a chain does not exist
-    error NonExistentChain(uint64 remoteChainSelector);
-
-    /// @notice Thrown when a source pool is invalid
-    error InvalidSourcePool(address pool);
-
-    /// @notice Thrown when a source pool address is invalid
-    error InvalidSourcePoolAddress(bytes sourcePoolAddress);
-
-    /// @notice Thrown when a pool is already added
-    error PoolAlreadyAdded(uint64 chainSelector, bytes remotePool);
-
-    /// @notice Thrown when a remote pool is invalid for a chain
-    error InvalidRemotePoolForChain(uint64 chainSelector, bytes remotePool);
-
-    /// @notice Thrown when slippage exceeds maximum allowed
-    error ExcessiveSlippage();
+    /// @notice Thrown when deployment fails
+    error FailedDeployment();
 
     /*//////////////////////////////////////////////////////////////
                             VALIDATION FUNCTIONS
@@ -185,6 +133,11 @@ library Errors {
         if (chainId == 0) revert ZeroChainId();
     }
 
+    /**
+     * @notice Verifies that a vault is active
+     * @dev Reverts with VaultNotActive if vault is not active
+     * @param isActive Whether the vault is active
+     */
     function verifyIfActive(bool isActive) internal pure {
         if (!isActive) revert VaultNotActive();
     }

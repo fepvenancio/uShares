@@ -7,6 +7,7 @@ import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
 import {CCTPAdapter} from "./libraries/CCTPAdapter.sol";
 import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
 import {IPositionManager} from "./interfaces/IPositionManager.sol";
+import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {USharesToken} from "./USharesToken.sol";
 import {IERC4626} from "./interfaces/IERC4626.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
@@ -166,17 +167,15 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
     constructor(
         address _usdc,
         ITokenMessenger _cctpTokenMessenger,
-        address _uSharesToken,
-        address _vaultRegistry,
-        address _positionManager
-    ) CCTPAdapter(_usdc, _cctpTokenMessenger) {
-        Errors.verifyAddress(_uSharesToken);
-        Errors.verifyAddress(_vaultRegistry);
-        Errors.verifyAddress(_positionManager);
+        USharesToken _uSharesToken,
+        IVaultRegistry _vaultRegistry,
+        IPositionManager _positionManager,
+        IMessageTransmitter _messageTransmitter
+    ) CCTPAdapter(_usdc, _cctpTokenMessenger, _messageTransmitter, _vaultRegistry) {
 
-        uSharesToken = USharesToken(_uSharesToken);
-        vaultRegistry = IVaultRegistry(_vaultRegistry);
-        positionManager = IPositionManager(_positionManager);
+        uSharesToken = _uSharesToken;
+        vaultRegistry = _vaultRegistry;
+        positionManager = _positionManager;
 
         _initializeOwner(msg.sender);
         _grantRoles(msg.sender, ADMIN_ROLE);
@@ -385,7 +384,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         if (usdcAmount < withdrawal.minUsdcExpected) revert Errors.InsufficientUSDC();
 
         // Bridge USDC back to user
-        _transferUsdc(withdrawal.destinationChain, withdrawal.user, usdcAmount);
+        _transferUsdcWithMessage(withdrawal.destinationChain, withdrawal.user, usdcAmount, "");
 
         emit CrossChainWithdrawalCompleted(
             withdrawalId,
@@ -432,7 +431,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
     function emergencyWithdraw(
         address token,
         uint256 amount
-    ) external onlyRoles(ADMIN_ROLE) whenPaused {
+    ) external onlyRoles(ADMIN_ROLE) whenNotPaused {
         Errors.verifyAddress(token);
         token.safeTransfer(owner(), amount);
         emit EmergencyWithdraw(token, amount, owner());
@@ -574,7 +573,8 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
      */
     function _handleReceivedMessage(
         uint32 sourceDomain,
-        bytes memory message
+        bytes memory message,
+        bytes memory attestation
     ) internal override {
         // Decode message
         (
