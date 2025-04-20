@@ -186,12 +186,13 @@ abstract contract CCTPAdapter {
      * @notice Handle received message from CCTP
      * @param sourceDomain Source domain of the message
      * @param message The message data
-     * @param attestation The attestation from Circle for the message
+     * @param attestation The attestation from Circle for the message (unused but required by interface)
      */
     function _handleReceivedMessage(
         uint32 sourceDomain,
         bytes memory message,
-        bytes memory attestation
+        // solhint-disable-next-line no-unused-vars
+        bytes memory attestation  // Required by interface but unused
     ) internal virtual {
         // Decode deposit data
         (
