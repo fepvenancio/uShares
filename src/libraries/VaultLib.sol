@@ -1,21 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
-import {Errors} from "./Errors.sol";
-import {IERC4626} from "../interfaces/IERC4626.sol";
+import { IERC4626 } from "../interfaces/IERC4626.sol";
+import { Errors } from "./Errors.sol";
 
 library VaultLib {
-    function convertToAssets(
-        address _vault,
-        uint256 _shares
-    ) internal view returns (uint256) {
+    function convertToAssets(address _vault, uint256 _shares) internal view returns (uint256) {
         return IERC4626(_vault).convertToAssets(_shares);
     }
 
-    function convertToShares(
-        address _vault,
-        uint256 _assets
-    ) internal view returns (uint256) {
+    function convertToShares(address _vault, uint256 _assets) internal view returns (uint256) {
         return IERC4626(_vault).convertToShares(_assets);
     }
 
@@ -33,9 +27,5 @@ library VaultLib {
         }
     }
 
-    function getVaultTotals(
-        address _vault
-    ) external view returns (uint256 totalAssets, uint256 totalShares) {
-        
-    }
+    function getVaultTotals(address _vault) external view returns (uint256 totalAssets, uint256 totalShares) { }
 }

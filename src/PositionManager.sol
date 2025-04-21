@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
-import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
-import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
-import {IPositionManager} from "./interfaces/IPositionManager.sol";
-import {KeyManager} from "./libraries/KeyManager.sol";
-import {Errors} from "./libraries/Errors.sol";
-import {DataTypes} from "./libraries/DataTypes.sol";
+import { IPositionManager } from "./interfaces/IPositionManager.sol";
+import { IVaultRegistry } from "./interfaces/IVaultRegistry.sol";
+
+import { DataTypes } from "./libraries/DataTypes.sol";
+import { Errors } from "./libraries/Errors.sol";
+import { KeyManager } from "./libraries/KeyManager.sol";
+import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
 
 /**
  * @title PositionManager
@@ -23,7 +24,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
 
     /// @notice Role identifier for admin operations
     uint256 public constant ADMIN_ROLE = _ROLE_0;
-    
+
     /// @notice Role identifier for handler operations (creating/updating positions)
     uint256 public constant HANDLER_ROLE = _ROLE_1;
 
@@ -33,9 +34,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
 
     /// @notice Reference to the vault registry contract
     IVaultRegistry public immutable vaultRegistry;
-    
-    /// @notice Mapping of addresses to their handler status
-    mapping(address => bool) public handlers;
 
     /// @notice Mapping of position keys to Position structs
     /// @dev Key format: keccak256(abi.encode(owner, sourceChain, destinationChain, destinationVault))
@@ -48,16 +46,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
     mapping(uint32 => address) public domainTokenPools;
 
     /*//////////////////////////////////////////////////////////////
-                                MODIFIERS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Ensures caller has the HANDLER_ROLE
-    modifier onlyHandler() {
-        if (!hasAnyRole(msg.sender, HANDLER_ROLE)) revert Errors.NotHandler();
-        _;
-    }
-
-    /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
@@ -65,9 +53,9 @@ contract PositionManager is IPositionManager, OwnableRoles {
     /// @param _vaultRegistry Address of the vault registry contract
     constructor(address _vaultRegistry) {
         Errors.verifyAddress(_vaultRegistry);
-        
+
         vaultRegistry = IVaultRegistry(_vaultRegistry);
-        
+
         _initializeOwner(msg.sender);
         _grantRoles(msg.sender, ADMIN_ROLE);
         _grantRoles(address(this), HANDLER_ROLE);
@@ -93,7 +81,11 @@ contract PositionManager is IPositionManager, OwnableRoles {
         uint32 destinationChain,
         address vault,
         uint256 shares
-    ) external onlyHandler returns (bytes32 positionKey) {
+    )
+        external
+        onlyRoles(HANDLER_ROLE)
+        returns (bytes32 positionKey)
+    {
         // Validate inputs
         Errors.verifyAddress(user);
         Errors.verifyChainId(sourceChain);
@@ -134,7 +126,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @param positionKey Unique position identifier
      * @param shares New share amount
      */
-    function updatePosition(bytes32 positionKey, uint256 shares) external onlyHandler {
+    function updatePosition(bytes32 positionKey, uint256 shares) external onlyRoles(HANDLER_ROLE) {
         Errors.verifyBytes32(positionKey);
 
         // Get position
@@ -153,7 +145,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @dev Sets position to inactive and zeros out shares
      * @param positionKey Unique position identifier
      */
-    function closePosition(bytes32 positionKey) external onlyHandler {
+    function closePosition(bytes32 positionKey) external onlyRoles(HANDLER_ROLE) {
         // Validate position exists
         DataTypes.Position storage position = positions[positionKey];
         if (!position.active) revert Errors.PositionNotFound();
@@ -197,30 +189,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
         return userPositions[user].length;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            ROLE MANAGEMENT
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Grants roles to a user
-     * @dev Only callable by admin
-     * @param user Address to grant roles to
-     * @param roles Roles to grant
-     */
-    function grantRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
-        _grantRoles(user, roles);
-    }
-
-    /**
-     * @notice Revokes roles from a user
-     * @dev Only callable by admin
-     * @param user Address to revoke roles from
-     * @param roles Roles to revoke
-     */
-    function revokeRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
-        _removeRoles(user, roles);
-    }
-
     /**
      * @notice Configures handler status for an address
      * @dev Only callable by admin
@@ -234,7 +202,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
         } else {
             _removeRoles(handler, HANDLER_ROLE);
         }
-        handlers[handler] = status;
+ 
         emit HandlerConfigured(handler, status);
     }
 
@@ -273,7 +241,12 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @param destinationVault Destination vault address
      * @return bytes32 Generated position key
      */
-    function getPositionKey(address owner, uint32 sourceChain, uint32 destinationChain, address destinationVault)
+    function getPositionKey(
+        address owner,
+        uint32 sourceChain,
+        uint32 destinationChain,
+        address destinationVault
+    )
         external
         pure
         returns (bytes32)

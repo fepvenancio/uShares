@@ -1,20 +1,26 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
+import "../src/USharesToken.sol";
+import { Client } from "chainlink/contracts/src/v0.8/ccip/libraries/Client.sol";
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
-import "../src/USharesToken.sol";
-import {Client} from "chainlink/contracts/src/v0.8/ccip/libraries/Client.sol";
 
 interface IRouterClient {
-    function ccipSend(uint64 destinationChainSelector, Client.EVM2AnyMessage calldata message) 
-        external 
-        payable 
+    function ccipSend(
+        uint64 destinationChainSelector,
+        Client.EVM2AnyMessage calldata message
+    )
+        external
+        payable
         returns (bytes32);
 
-    function getFee(uint64 destinationChainSelector, Client.EVM2AnyMessage calldata message) 
-        external 
-        view 
+    function getFee(
+        uint64 destinationChainSelector,
+        Client.EVM2AnyMessage calldata message
+    )
+        external
+        view
         returns (uint256 fee);
 }
 
@@ -23,14 +29,14 @@ contract CrossChainTransfer is Script {
     address constant USHARES_BASE = 0x5a44dCE25ab945b625e6A92f9E95Beac953033df;
     address constant ROUTER = 0x881e3A65B4d4a04dD529061dd0071cf975F58bCD;
     address constant TOKEN_POOL = 0x6b4e324d91bc3ffE7b398B674B3A8f32bF43cB1A;
-    
+
     // Chain Selector for Polygon from CCIP docs
-    uint64 constant POLYGON_CHAIN_SELECTOR = 3734403246176062136;
+    uint64 constant POLYGON_CHAIN_SELECTOR = 3_734_403_246_176_062_136;
 
     function run() external {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         address sender = vm.addr(privateKey);
-        
+
         console.log("Starting cross-chain transfer from Base to Polygon");
         console.log("Sender address:", sender);
 
@@ -55,16 +61,11 @@ contract CrossChainTransfer is Script {
 
         // 3. Create token amount array
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-        tokenAmounts[0] = Client.EVMTokenAmount({
-            token: USHARES_BASE,
-            amount: amount
-        });
+        tokenAmounts[0] = Client.EVMTokenAmount({ token: USHARES_BASE, amount: amount });
 
         // 4. Prepare EVMExtraArgsV2
-        Client.EVMExtraArgsV2 memory extraArgs = Client.EVMExtraArgsV2({
-            gasLimit: 200000,
-            allowOutOfOrderExecution: false
-        });
+        Client.EVMExtraArgsV2 memory extraArgs =
+            Client.EVMExtraArgsV2({ gasLimit: 200_000, allowOutOfOrderExecution: false });
 
         // 5. Create CCIP message
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
@@ -73,7 +74,7 @@ contract CrossChainTransfer is Script {
             tokenAmounts: tokenAmounts,
             extraArgs: Client._argsToBytes(extraArgs),
             feeToken: address(0) // Use native token for fees
-        });
+         });
 
         // 6. Get the fee
         IRouterClient router = IRouterClient(ROUTER);
@@ -81,7 +82,7 @@ contract CrossChainTransfer is Script {
         console.log("CCIP Fee:", fee);
 
         // 7. Send CCIP Message
-        bytes32 messageId = router.ccipSend{value: fee}(POLYGON_CHAIN_SELECTOR, message);
+        bytes32 messageId = router.ccipSend{ value: fee }(POLYGON_CHAIN_SELECTOR, message);
         console.log("Transfer initiated, messageId:", vm.toString(messageId));
 
         vm.stopBroadcast();

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
-import {Script, console} from "forge-std/Script.sol";
-import {BurnMintERC677} from "chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
-import {AddressBook} from "./utils/AddressBook.sol";
+import { AddressBook } from "./utils/AddressBook.sol";
+import { BurnMintERC677 } from "chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
+import { Script, console } from "forge-std/Script.sol";
 
 contract MintTokens is Script {
     address tokenAddress;
@@ -17,9 +17,9 @@ contract MintTokens is Script {
             tokenAddress = AddressBook.BASE_USharesToken;
         } else {
             revert("Unsupported chain ID");
-        }        
+        }
 
-        uint256 amount = 1000000000; 
+        uint256 amount = 1_000_000_000;
         // Use the sender's address as the receiver of the minted tokens
         address receiverAddress = AddressBook.DEPLOYER_ADDRESS;
 

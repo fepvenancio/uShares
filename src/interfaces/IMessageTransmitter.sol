@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
 interface IMessageTransmitter {
     /**
@@ -14,5 +14,7 @@ interface IMessageTransmitter {
         uint32 destinationDomain,
         bytes32 recipient,
         bytes calldata messageBody
-    ) external returns (uint64);
+    )
+        external
+        returns (uint64);
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
 /**
  * @title Errors
@@ -20,6 +20,8 @@ library Errors {
     error Unauthorized();
     /// @notice Thrown when caller is not a bridge
     error NotBridge();
+    /// @notice Thrown when caller is not an admin
+    error NotAdmin();
 
     /*//////////////////////////////////////////////////////////////
                             INPUT VALIDATION ERRORS
@@ -86,6 +88,10 @@ library Errors {
     error RateLimitExceeded(address token, uint256 requested, uint256 available);
     /// @notice Thrown when deployment fails
     error FailedDeployment();
+    /// @notice Thrown when fallback call fails
+    error Fallback();
+    /// @notice Thrown when a contract cannot receive ETH
+    error CantReceiveETH();
 
     /*//////////////////////////////////////////////////////////////
                             VALIDATION FUNCTIONS

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
 interface ITokenMinter {
     /**
@@ -8,4 +8,4 @@ interface ITokenMinter {
      * @return The burn limit
      */
     function burnLimitsPerMessage(address token) external view returns (uint256);
-} 
+}

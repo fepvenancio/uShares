@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
-import {Script} from "forge-std/Script.sol";
+import { Script } from "forge-std/Script.sol";
 
 contract Config is Script {
     NetworkConfig public activeNetworkConfig;
@@ -27,7 +27,7 @@ contract Config is Script {
 
     function getOptimismConfig() public pure returns (NetworkConfig memory) {
         NetworkConfig memory opConfig = NetworkConfig({
-            chainSelector: 3734403246176062136,
+            chainSelector: 3_734_403_246_176_062_136,
             router: 0x3206695CaE29952f4b0c22a169725a865bc8Ce0f,
             rmnProxy: 0x55b3FCa23EdDd28b1f5B4a3C7975f63EFd2d06CE,
             tokenAdminRegistry: 0x657c42abE4CD8aa731Aec322f871B5b90cf6274F,
@@ -41,7 +41,7 @@ contract Config is Script {
 
     function getBaseConfig() public pure returns (NetworkConfig memory) {
         NetworkConfig memory baseConfig = NetworkConfig({
-            chainSelector: 15971525489660198786,
+            chainSelector: 15_971_525_489_660_198_786,
             router: 0x881e3A65B4d4a04dD529061dd0071cf975F58bCD,
             rmnProxy: 0xC842c69d54F83170C42C4d556B4F6B2ca53Dd3E8,
             tokenAdminRegistry: 0x6f6C373d09C07425BaAE72317863d7F6bb731e37,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
-import {DataTypes} from "../libraries/DataTypes.sol";
+import { DataTypes } from "../libraries/DataTypes.sol";
 
 interface IPositionManager {
     // Events
@@ -30,7 +30,9 @@ interface IPositionManager {
         uint32 destinationChain,
         address destinationVault,
         uint256 shares
-    ) external returns (bytes32 positionKey);
+    )
+        external
+        returns (bytes32 positionKey);
 
     function updatePosition(bytes32 positionKey, uint256 newShares) external;
 
@@ -44,7 +46,12 @@ interface IPositionManager {
 
     function getUserPositionCount(address user) external view returns (uint256);
 
-    function getPositionKey(address owner, uint32 sourceChain, uint32 destinationChain, address destinationVault)
+    function getPositionKey(
+        address owner,
+        uint32 sourceChain,
+        uint32 destinationChain,
+        address destinationVault
+    )
         external
         pure
         returns (bytes32);

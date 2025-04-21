@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
-import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
-import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
-import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
-import {CCTPAdapter} from "./libraries/CCTPAdapter.sol";
-import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
-import {IPositionManager} from "./interfaces/IPositionManager.sol";
-import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
-import {USharesToken} from "./USharesToken.sol";
-import {IERC4626} from "./interfaces/IERC4626.sol";
-import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
-import {Errors} from "./libraries/Errors.sol";
-import {DataTypes} from "./libraries/DataTypes.sol";
+import { USharesToken } from "./USharesToken.sol";
+import { IERC4626 } from "./interfaces/IERC4626.sol";
+import { IMessageTransmitter } from "./interfaces/IMessageTransmitter.sol";
+import { IPositionManager } from "./interfaces/IPositionManager.sol";
+
+import { ITokenMessenger } from "./interfaces/ITokenMessenger.sol";
+import { IVaultRegistry } from "./interfaces/IVaultRegistry.sol";
+import { CCTPAdapter } from "./libraries/CCTPAdapter.sol";
+
+import { DataTypes } from "./libraries/DataTypes.sol";
+import { Errors } from "./libraries/Errors.sol";
+import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
+import { ReentrancyGuard } from "solady/utils/ReentrancyGuard.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 /**
  * @title UShares
@@ -33,7 +35,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
     /// @notice Maximum timeout period for pending operations
     uint256 public constant MAX_TIMEOUT = 1 days;
     /// @notice Basis points denominator
-    uint256 private constant BASIS_POINTS = 10000;
+    uint256 private constant BASIS_POINTS = 10_000;
     /// @notice Maximum fee in basis points (1%)
     uint256 private constant MAX_FEE = 100;
 
@@ -77,28 +79,17 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     event DepositInitiated(
-        address indexed user,
-        uint32 destinationChain,
-        address indexed vault,
-        uint256 amount,
-        uint256 minSharesExpected
+        address indexed user, uint32 destinationChain, address indexed vault, uint256 amount, uint256 minSharesExpected
     );
 
     event WithdrawalInitiated(
-        address indexed user,
-        uint32 destinationChain,
-        address indexed vault,
-        uint256 shares,
-        uint256 minUsdcExpected
+        address indexed user, uint32 destinationChain, address indexed vault, uint256 shares, uint256 minUsdcExpected
     );
 
     event LimitsUpdated(uint32 domain, uint256 minAmount, uint256 maxAmount);
 
     event CrossChainDepositCompleted(
-        bytes32 indexed depositId,
-        address indexed user,
-        address indexed vault,
-        uint256 shares
+        bytes32 indexed depositId, address indexed user, address indexed vault, uint256 shares
     );
 
     event CrossChainWithdrawalInitiated(
@@ -110,10 +101,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
     );
 
     event CrossChainWithdrawalCompleted(
-        bytes32 indexed withdrawalId,
-        address indexed user,
-        address indexed vault,
-        uint256 usdcAmount
+        bytes32 indexed withdrawalId, address indexed user, address indexed vault, uint256 usdcAmount
     );
 
     event DepositTimeout(bytes32 indexed depositId, address user, uint256 amount);
@@ -134,8 +122,9 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
     }
 
     modifier validAmount(uint32 domain, uint256 amount) {
-        if (amount < minDeposit[domain] || amount > maxDeposit[domain]) 
+        if (amount < minDeposit[domain] || amount > maxDeposit[domain]) {
             revert Errors.InvalidAmount();
+        }
         _;
     }
 
@@ -171,7 +160,9 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         IVaultRegistry _vaultRegistry,
         IPositionManager _positionManager,
         IMessageTransmitter _messageTransmitter
-    ) CCTPAdapter(_usdc, _cctpTokenMessenger, _messageTransmitter, _vaultRegistry) {
+    )
+        CCTPAdapter(_usdc, _cctpTokenMessenger, _messageTransmitter, _vaultRegistry)
+    {
 
         uSharesToken = _uSharesToken;
         vaultRegistry = _vaultRegistry;
@@ -180,6 +171,19 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         _initializeOwner(msg.sender);
         _grantRoles(msg.sender, ADMIN_ROLE);
         _grantRoles(address(_cctpTokenMessenger), BRIDGE_ROLE);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    Fallback and Receive Functions
+    //////////////////////////////////////////////////////////////*/
+    // Explicitly reject any Ether sent to the contract
+    fallback() external payable {
+        revert Errors.Fallback();
+    }
+
+    // Explicitly reject any Ether transfered to the contract
+    receive() external payable {
+        revert Errors.CantReceiveETH();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -200,7 +204,13 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         address vault,
         uint256 minSharesExpected,
         uint256 deadline
-    ) external nonReentrant whenNotPaused validAmount(destinationChain, amount) validAddress(vault) {
+    )
+        external
+        nonReentrant
+        whenNotPaused
+        validAmount(destinationChain, amount)
+        validAddress(vault)
+    {
         if (block.timestamp > deadline) revert Errors.DeadlineExpired();
         if (!vaultRegistry.isVaultActive(destinationChain, vault)) {
             revert Errors.VaultNotActive();
@@ -223,23 +233,10 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
             _handleSameChainDeposit(msg.sender, vault, depositAmount, minSharesExpected);
         } else {
             // Handle cross-chain deposit
-            _handleCrossChainDeposit(
-                msg.sender,
-                destinationChain,
-                vault,
-                depositAmount,
-                minSharesExpected,
-                deadline
-            );
+            _handleCrossChainDeposit(msg.sender, destinationChain, vault, depositAmount, minSharesExpected, deadline);
         }
 
-        emit DepositInitiated(
-            msg.sender,
-            destinationChain,
-            vault,
-            depositAmount,
-            minSharesExpected
-        );
+        emit DepositInitiated(msg.sender, destinationChain, vault, depositAmount, minSharesExpected);
     }
 
     /**
@@ -256,7 +253,12 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         address vault,
         uint256 minUsdcExpected,
         uint256 deadline
-    ) external nonReentrant whenNotPaused validAddress(vault) {
+    )
+        external
+        nonReentrant
+        whenNotPaused
+        validAddress(vault)
+    {
         if (block.timestamp > deadline) revert Errors.DeadlineExpired();
         if (!vaultRegistry.isVaultActive(destinationChain, vault)) {
             revert Errors.VaultNotActive();
@@ -269,25 +271,12 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
             uSharesToken.burnFrom(msg.sender, shares);
         } else {
             // Handle cross-chain withdrawal
-            _handleCrossChainWithdrawal(
-                msg.sender,
-                destinationChain,
-                vault,
-                shares,
-                minUsdcExpected,
-                deadline
-            );
+            _handleCrossChainWithdrawal(msg.sender, destinationChain, vault, shares, minUsdcExpected, deadline);
             // For cross-chain, burn immediately as position is tracked
             uSharesToken.burnFrom(msg.sender, shares);
         }
 
-        emit WithdrawalInitiated(
-            msg.sender,
-            destinationChain,
-            vault,
-            shares,
-            minUsdcExpected
-        );
+        emit WithdrawalInitiated(msg.sender, destinationChain, vault, shares, minUsdcExpected);
     }
 
     /**
@@ -296,16 +285,12 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
      * @param _minDeposit Minimum deposit amount
      * @param _maxDeposit Maximum deposit amount
      */
-    function updateLimits(
-        uint32 domain,
-        uint256 _minDeposit,
-        uint256 _maxDeposit
-    ) external onlyRoles(ADMIN_ROLE) {
+    function updateLimits(uint32 domain, uint256 _minDeposit, uint256 _maxDeposit) external onlyRoles(ADMIN_ROLE) {
         if (_minDeposit >= _maxDeposit) revert Errors.InvalidConfig();
-        
+
         minDeposit[domain] = _minDeposit;
         maxDeposit[domain] = _maxDeposit;
-        
+
         emit LimitsUpdated(domain, _minDeposit, _maxDeposit);
     }
 
@@ -349,10 +334,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
 
         // Update position with actual shares
         bytes32 positionKey = positionManager.getPositionKey(
-            pendingDeposit.user,
-            pendingDeposit.sourceChain,
-            uint32(block.chainid),
-            vault
+            pendingDeposit.user, pendingDeposit.sourceChain, uint32(block.chainid), vault
         );
         positionManager.updatePosition(positionKey, shares);
 
@@ -375,23 +357,14 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         delete pendingWithdrawals[withdrawalId];
 
         // Withdraw from vault
-        uint256 usdcAmount = IERC4626(withdrawal.vault).redeem(
-            withdrawal.shares,
-            address(this),
-            address(this)
-        );
+        uint256 usdcAmount = IERC4626(withdrawal.vault).redeem(withdrawal.shares, address(this), address(this));
 
         if (usdcAmount < withdrawal.minUsdcExpected) revert Errors.InsufficientUSDC();
 
         // Bridge USDC back to user
         _transferUsdcWithMessage(withdrawal.destinationChain, withdrawal.user, usdcAmount, "");
 
-        emit CrossChainWithdrawalCompleted(
-            withdrawalId,
-            withdrawal.user,
-            withdrawal.vault,
-            usdcAmount
-        );
+        emit CrossChainWithdrawalCompleted(withdrawalId, withdrawal.user, withdrawal.vault, usdcAmount);
     }
 
     /**
@@ -428,10 +401,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
      * @param token Token to withdraw
      * @param amount Amount to withdraw
      */
-    function emergencyWithdraw(
-        address token,
-        uint256 amount
-    ) external onlyRoles(ADMIN_ROLE) whenNotPaused {
+    function emergencyWithdraw(address token, uint256 amount) external onlyRoles(ADMIN_ROLE) whenNotPaused {
         Errors.verifyAddress(token);
         token.safeTransfer(owner(), amount);
         emit EmergencyWithdraw(token, amount, owner());
@@ -452,11 +422,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
      * @param chain Chain ID
      * @param newFee New fee in basis points
      */
-    function setChainFee(uint32 chain, uint256 newFee) 
-        external 
-        onlyRoles(ADMIN_ROLE) 
-        validFee(newFee) 
-    {
+    function setChainFee(uint32 chain, uint256 newFee) external onlyRoles(ADMIN_ROLE) validFee(newFee) {
         uint256 oldFee = chainFees[chain];
         chainFees[chain] = newFee;
         emit ChainFeeUpdated(chain, oldFee, newFee);
@@ -466,11 +432,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
      * @notice Set fee collector address
      * @param newCollector New fee collector address
      */
-    function setFeeCollector(address newCollector) 
-        external 
-        onlyRoles(ADMIN_ROLE) 
-        validAddress(newCollector) 
-    {
+    function setFeeCollector(address newCollector) external onlyRoles(ADMIN_ROLE) validAddress(newCollector) {
         address oldCollector = feeCollector;
         feeCollector = newCollector;
         emit FeeCollectorUpdated(oldCollector, newCollector);
@@ -498,12 +460,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
      * @param amount Amount of USDC
      * @param minSharesExpected Minimum shares expected
      */
-    function _handleSameChainDeposit(
-        address user,
-        address vault,
-        uint256 amount,
-        uint256 minSharesExpected
-    ) internal {
+    function _handleSameChainDeposit(address user, address vault, uint256 amount, uint256 minSharesExpected) internal {
         // Approve vault to spend USDC
         usdc.safeApprove(vault, amount);
 
@@ -512,13 +469,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         if (shares < minSharesExpected) revert Errors.InsufficientShares();
 
         // Create position and store position key
-        positionManager.createPosition(
-            user,
-            uint32(block.chainid),
-            uint32(block.chainid),
-            vault,
-            shares
-        );
+        positionManager.createPosition(user, uint32(block.chainid), uint32(block.chainid), vault, shares);
 
         // Mint uShares tokens
         uSharesToken.mint(user, shares);
@@ -531,18 +482,12 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         uint256 amount,
         uint256 minSharesExpected,
         // solhint-disable-next-line no-unused-vars
-        uint256 deadline  // Required for interface compatibility
-    ) internal {
-        bytes32 depositId = keccak256(
-            abi.encode(
-                user,
-                uint32(block.chainid),
-                destinationChain,
-                vault,
-                amount,
-                block.timestamp
-            )
-        );
+        uint256 deadline // Required for interface compatibility
+    )
+        internal
+    {
+        bytes32 depositId =
+            keccak256(abi.encode(user, uint32(block.chainid), destinationChain, vault, amount, block.timestamp));
 
         // Store pending deposit info
         pendingDeposits[depositId] = DataTypes.PendingDeposit({
@@ -555,13 +500,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         });
 
         // Encode deposit data
-        bytes memory message = abi.encode(
-            depositId,
-            user,
-            vault,
-            amount,
-            minSharesExpected
-        );
+        bytes memory message = abi.encode(depositId, user, vault, amount, minSharesExpected);
 
         // Bridge USDC with message
         _transferUsdcWithMessage(destinationChain, address(this), amount, message);
@@ -576,16 +515,14 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         uint32 sourceDomain,
         bytes memory message,
         // solhint-disable-next-line no-unused-vars
-        bytes memory attestation  // Required by CCTP interface
-    ) internal override {
+        bytes memory attestation // Required by CCTP interface
+    )
+        internal
+        override
+    {
         // Decode message
-        (
-            bytes32 depositId,
-            address user,
-            address vault,
-            uint256 amount,
-            uint256 minSharesExpected
-        ) = abi.decode(message, (bytes32, address, address, uint256, uint256));
+        (bytes32 depositId, address user, address vault, uint256 amount, uint256 minSharesExpected) =
+            abi.decode(message, (bytes32, address, address, uint256, uint256));
 
         // Complete deposit
         _completeDeposit(depositId, sourceDomain, user, vault, amount, minSharesExpected);
@@ -601,7 +538,9 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         address vault,
         uint256 amount,
         uint256 minSharesExpected
-    ) internal {
+    )
+        internal
+    {
         // Verify vault is active
         if (!vaultRegistry.isVaultActive(uint32(block.chainid), vault)) {
             revert Errors.VaultNotActive();
@@ -613,22 +552,11 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         if (shares < minSharesExpected) revert Errors.InsufficientShares();
 
         // Create or update position
-        bytes32 positionKey = positionManager.getPositionKey(
-            user,
-            sourceDomain,
-            uint32(block.chainid),
-            vault
-        );
+        bytes32 positionKey = positionManager.getPositionKey(user, sourceDomain, uint32(block.chainid), vault);
 
         // If position doesn't exist, create it
         if (!positionManager.isPositionActive(positionKey)) {
-            positionManager.createPosition(
-                user,
-                sourceDomain,
-                uint32(block.chainid),
-                vault,
-                shares
-            );
+            positionManager.createPosition(user, sourceDomain, uint32(block.chainid), vault, shares);
         } else {
             positionManager.updatePosition(positionKey, shares);
         }
@@ -646,18 +574,12 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         uint256 shares,
         uint256 minUsdcExpected,
         // solhint-disable-next-line no-unused-vars
-        uint256 deadline  // Required for interface compatibility
-    ) internal {
-        bytes32 withdrawalId = keccak256(
-            abi.encode(
-                user,
-                uint32(block.chainid),
-                destinationChain,
-                vault,
-                shares,
-                block.timestamp
-            )
-        );
+        uint256 deadline // Required for interface compatibility
+    )
+        internal
+    {
+        bytes32 withdrawalId =
+            keccak256(abi.encode(user, uint32(block.chainid), destinationChain, vault, shares, block.timestamp));
 
         pendingWithdrawals[withdrawalId] = DataTypes.PendingWithdrawal({
             user: user,
@@ -669,13 +591,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
             timestamp: uint64(block.timestamp)
         });
 
-        emit CrossChainWithdrawalInitiated(
-            withdrawalId,
-            user,
-            vault,
-            shares,
-            minUsdcExpected
-        );
+        emit CrossChainWithdrawalInitiated(withdrawalId, user, vault, shares, minUsdcExpected);
     }
 
     /**
@@ -690,23 +606,16 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         address vault,
         uint256 shares,
         uint256 minUsdcExpected
-    ) internal {
+    )
+        internal
+    {
         // Withdraw from vault
-        uint256 usdcAmount = IERC4626(vault).redeem(
-            shares,
-            user,
-            address(this)
-        );
+        uint256 usdcAmount = IERC4626(vault).redeem(shares, user, address(this));
 
         if (usdcAmount < minUsdcExpected) revert Errors.InsufficientUSDC();
 
         // Update position
-        bytes32 positionKey = positionManager.getPositionKey(
-            user,
-            uint32(block.chainid),
-            uint32(block.chainid),
-            vault
-        );
+        bytes32 positionKey = positionManager.getPositionKey(user, uint32(block.chainid), uint32(block.chainid), vault);
         positionManager.closePosition(positionKey);
     }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
 /**
  * @title CircleDomains
@@ -14,4 +14,4 @@ library CircleDomains {
     uint32 public constant BASE = 6;
     uint32 public constant POLYGON = 7;
     uint32 public constant AVALANCHE = 1;
-} 
+}

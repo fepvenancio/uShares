@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
 /**
  * @title DataTypes
@@ -90,4 +90,4 @@ library DataTypes {
         uint256 minUsdcExpected;
         uint64 timestamp;
     }
-} 
+}

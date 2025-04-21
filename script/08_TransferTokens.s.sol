@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29; // Network configuration helper
 
-import {Script, console} from "forge-std/Script.sol";
-import {Config} from "./utils/Config.s.sol"; // Network configuration helper
-import {IERC20} from
+import { AddressBook } from "./utils/AddressBook.sol";
+import { Config } from "./utils/Config.s.sol";
+import { IRouterClient } from "chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
+import { Client } from "chainlink/contracts/src/v0.8/ccip/libraries/Client.sol";
+import { IERC20 } from
     "chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {IRouterClient} from "chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
-import {Client} from "chainlink/contracts/src/v0.8/ccip/libraries/Client.sol";
-import {AddressBook} from "./utils/AddressBook.sol";
+import { Script, console } from "forge-std/Script.sol";
 
 contract TransferTokens is Script {
     enum Fee {
@@ -32,7 +32,7 @@ contract TransferTokens is Script {
         }
 
         // Read the amount to transfer and feeType from config.json
-        uint256 amount = 30000000;
+        uint256 amount = 30_000_000;
 
         // Fetch the network configuration for the current chain
         Config helperConfig = new Config();
@@ -42,9 +42,7 @@ contract TransferTokens is Script {
         require(amount > 0, "Invalid amount to transfer");
         require(destinationChainSelector != 0, "Chain selector not defined for the destination chain");
 
-
         address feeTokenAddress = address(0); // Use native token (e.g., ETH, AVAX)
-
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -67,7 +65,7 @@ contract TransferTokens is Script {
         });
 
         // Set the token and amount to transfer
-        message.tokenAmounts[0] = Client.EVMTokenAmount({token: tokenAddress, amount: amount});
+        message.tokenAmounts[0] = Client.EVMTokenAmount({ token: tokenAddress, amount: amount });
 
         // Approve the router to transfer tokens on behalf of the sender
         IERC20(tokenAddress).approve(router, amount);
@@ -80,7 +78,7 @@ contract TransferTokens is Script {
         bytes32 messageId;
         if (feeTokenAddress == address(0)) {
             // Pay fees with native token
-            messageId = routerContract.ccipSend{value: fees}(destinationChainSelector, message);
+            messageId = routerContract.ccipSend{ value: fees }(destinationChainSelector, message);
         } else {
             // Approve the router to spend LINK tokens for fees
             IERC20(feeTokenAddress).approve(router, fees);
@@ -94,7 +92,8 @@ contract TransferTokens is Script {
         // Provide a URL to check the status of the message
         string memory messageUrl = string(
             abi.encodePacked(
-                "Check status of the message at https://ccip.chain.link/msg/", helperConfig.bytes32ToHexString(messageId)
+                "Check status of the message at https://ccip.chain.link/msg/",
+                helperConfig.bytes32ToHexString(messageId)
             )
         );
         console.log(messageUrl);

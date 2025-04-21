@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29; // Network configuration helper
 
-import {Script, console} from "forge-std/Script.sol";
-import {Config} from "./utils/Config.s.sol"; // Network configuration helper
-import {BurnMintTokenPool} from "chainlink/contracts/src/v0.8/ccip/pools/BurnMintTokenPool.sol";
-import {BurnMintERC677} from "chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
-import {IBurnMintERC20} from "chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
-import {AddressBook} from "./utils/AddressBook.sol";
+import { AddressBook } from "./utils/AddressBook.sol";
+import { Config } from "./utils/Config.s.sol";
+import { BurnMintTokenPool } from "chainlink/contracts/src/v0.8/ccip/pools/BurnMintTokenPool.sol";
+import { IBurnMintERC20 } from "chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
+import { BurnMintERC677 } from "chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
+import { Script, console } from "forge-std/Script.sol";
 
 contract DeployBurnMintTokenPool is Script {
     address tokenAddress;
     address tokenAdmin;
 
     function run() external {
-
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         if (block.chainid == AddressBook.OPTIMISM) {

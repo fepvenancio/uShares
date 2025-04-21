@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
-import {Errors} from "./Errors.sol";
+import { Errors } from "./Errors.sol";
 
 /**
  * @title KeyManager
@@ -10,7 +10,6 @@ import {Errors} from "./Errors.sol";
  * @custom:security-contact security@ushares.com
  */
 library KeyManager {
-
     /*//////////////////////////////////////////////////////////////
                             KEY GENERATION
     //////////////////////////////////////////////////////////////*/
@@ -29,21 +28,17 @@ library KeyManager {
         uint32 sourceChain,
         uint32 destinationChain,
         address destinationVault
-    ) internal pure returns (bytes32) {
+    )
+        internal
+        pure
+        returns (bytes32)
+    {
         Errors.verifyAddress(owner);
         Errors.verifyNumber(sourceChain);
         Errors.verifyNumber(destinationChain);
         Errors.verifyAddress(destinationVault);
 
-        return
-            keccak256(
-                abi.encode(
-                    owner,
-                    sourceChain,
-                    destinationChain,
-                    destinationVault
-                )
-            );
+        return keccak256(abi.encode(owner, sourceChain, destinationChain, destinationVault));
     }
 
     /**
@@ -53,10 +48,7 @@ library KeyManager {
      * @param vault Vault address
      * @return bytes32 Unique vault identifier
      */
-    function getVaultKey(
-        uint32 chainId,
-        address vault
-    ) internal pure returns (bytes32) {
+    function getVaultKey(uint32 chainId, address vault) internal pure returns (bytes32) {
         Errors.verifyNumber(chainId);
         Errors.verifyAddress(vault);
 
@@ -83,13 +75,12 @@ library KeyManager {
         uint32 sourceChain,
         uint32 destinationChain,
         address destinationVault
-    ) internal pure returns (bool) {
-        bytes32 key = getPositionKey(
-            owner,
-            sourceChain,
-            destinationChain,
-            destinationVault
-        );
+    )
+        internal
+        pure
+        returns (bool)
+    {
+        bytes32 key = getPositionKey(owner, sourceChain, destinationChain, destinationVault);
         return keyToValidate == key;
     }
 
@@ -101,11 +92,7 @@ library KeyManager {
      * @param vault Vault address
      * @return bool True if key is valid
      */
-    function isValidVaultKey(
-        bytes32 key,
-        uint32 chainId,
-        address vault
-    ) internal pure returns (bool) {
+    function isValidVaultKey(bytes32 key, uint32 chainId, address vault) internal pure returns (bool) {
         bytes32 expectedKey = getVaultKey(chainId, vault);
         return key == expectedKey;
     }
