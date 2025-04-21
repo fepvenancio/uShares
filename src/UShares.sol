@@ -7,6 +7,7 @@ import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
 import {CCTPAdapter} from "./libraries/CCTPAdapter.sol";
 import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
 import {IPositionManager} from "./interfaces/IPositionManager.sol";
+import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {USharesToken} from "./USharesToken.sol";
 import {IERC4626} from "./interfaces/IERC4626.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
@@ -166,17 +167,15 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
     constructor(
         address _usdc,
         ITokenMessenger _cctpTokenMessenger,
-        address _uSharesToken,
-        address _vaultRegistry,
-        address _positionManager
-    ) CCTPAdapter(_usdc, _cctpTokenMessenger) {
-        Errors.verifyAddress(_uSharesToken);
-        Errors.verifyAddress(_vaultRegistry);
-        Errors.verifyAddress(_positionManager);
+        USharesToken _uSharesToken,
+        IVaultRegistry _vaultRegistry,
+        IPositionManager _positionManager,
+        IMessageTransmitter _messageTransmitter
+    ) CCTPAdapter(_usdc, _cctpTokenMessenger, _messageTransmitter, _vaultRegistry) {
 
-        uSharesToken = USharesToken(_uSharesToken);
-        vaultRegistry = IVaultRegistry(_vaultRegistry);
-        positionManager = IPositionManager(_positionManager);
+        uSharesToken = _uSharesToken;
+        vaultRegistry = _vaultRegistry;
+        positionManager = _positionManager;
 
         _initializeOwner(msg.sender);
         _grantRoles(msg.sender, ADMIN_ROLE);
@@ -329,38 +328,38 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
      * @param depositId The unique deposit identifier
      */
     function completeDeposit(bytes32 depositId) external onlyBridge {
-        DataTypes.PendingDeposit memory deposit = pendingDeposits[depositId];
-        if (deposit.timestamp == 0) revert Errors.InvalidDeposit();
-        if (block.timestamp > deposit.timestamp + MAX_TIMEOUT) revert Errors.DepositExpired();
-        if (sourceChainUShares[deposit.sourceChain] == address(0)) revert Errors.InvalidSource();
+        DataTypes.PendingDeposit memory pendingDeposit = pendingDeposits[depositId];
+        if (pendingDeposit.timestamp == 0) revert Errors.InvalidDeposit();
+        if (block.timestamp > pendingDeposit.timestamp + MAX_TIMEOUT) revert Errors.DepositExpired();
+        if (sourceChainUShares[pendingDeposit.sourceChain] == address(0)) revert Errors.InvalidSource();
 
         // Clear pending deposit
         delete pendingDeposits[depositId];
 
         // Get the vault
-        address vault = deposit.vault;
+        address vault = pendingDeposit.vault;
         if (!vaultRegistry.isVaultActive(uint32(block.chainid), vault)) {
             revert Errors.VaultNotActive();
         }
 
         // Approve and deposit into vault
-        usdc.safeApprove(vault, deposit.amount);
-        uint256 shares = IERC4626(vault).deposit(deposit.amount, address(this));
-        if (shares < deposit.minSharesExpected) revert Errors.InsufficientShares();
+        usdc.safeApprove(vault, pendingDeposit.amount);
+        uint256 shares = IERC4626(vault).deposit(pendingDeposit.amount, address(this));
+        if (shares < pendingDeposit.minSharesExpected) revert Errors.InsufficientShares();
 
         // Update position with actual shares
         bytes32 positionKey = positionManager.getPositionKey(
-            deposit.user,
-            deposit.sourceChain,
+            pendingDeposit.user,
+            pendingDeposit.sourceChain,
             uint32(block.chainid),
             vault
         );
         positionManager.updatePosition(positionKey, shares);
 
         // Mint uShares tokens to user
-        uSharesToken.mint(deposit.user, shares);
+        uSharesToken.mint(pendingDeposit.user, shares);
 
-        emit CrossChainDepositCompleted(depositId, deposit.user, vault, shares);
+        emit CrossChainDepositCompleted(depositId, pendingDeposit.user, vault, shares);
     }
 
     /**
@@ -385,7 +384,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         if (usdcAmount < withdrawal.minUsdcExpected) revert Errors.InsufficientUSDC();
 
         // Bridge USDC back to user
-        _transferUsdc(withdrawal.destinationChain, withdrawal.user, usdcAmount);
+        _transferUsdcWithMessage(withdrawal.destinationChain, withdrawal.user, usdcAmount, "");
 
         emit CrossChainWithdrawalCompleted(
             withdrawalId,
@@ -401,11 +400,11 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
      */
     function cleanupTimedOutDeposits(bytes32[] calldata depositIds) external {
         for (uint256 i = 0; i < depositIds.length; i++) {
-            DataTypes.PendingDeposit memory deposit = pendingDeposits[depositIds[i]];
-            if (deposit.timestamp != 0 && block.timestamp > deposit.timestamp + MAX_TIMEOUT) {
+            DataTypes.PendingDeposit memory timedOutDeposit = pendingDeposits[depositIds[i]];
+            if (timedOutDeposit.timestamp != 0 && block.timestamp > timedOutDeposit.timestamp + MAX_TIMEOUT) {
                 // Refund logic would be handled by governance
                 delete pendingDeposits[depositIds[i]];
-                emit DepositTimeout(depositIds[i], deposit.user, deposit.amount);
+                emit DepositTimeout(depositIds[i], timedOutDeposit.user, timedOutDeposit.amount);
             }
         }
     }
@@ -432,7 +431,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
     function emergencyWithdraw(
         address token,
         uint256 amount
-    ) external onlyRoles(ADMIN_ROLE) whenPaused {
+    ) external onlyRoles(ADMIN_ROLE) whenNotPaused {
         Errors.verifyAddress(token);
         token.safeTransfer(owner(), amount);
         emit EmergencyWithdraw(token, amount, owner());
@@ -512,8 +511,8 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         uint256 shares = IERC4626(vault).deposit(amount, address(this));
         if (shares < minSharesExpected) revert Errors.InsufficientShares();
 
-        // Create position
-        bytes32 positionKey = positionManager.createPosition(
+        // Create position and store position key
+        positionManager.createPosition(
             user,
             uint32(block.chainid),
             uint32(block.chainid),
@@ -531,7 +530,8 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         address vault,
         uint256 amount,
         uint256 minSharesExpected,
-        uint256 deadline
+        // solhint-disable-next-line no-unused-vars
+        uint256 deadline  // Required for interface compatibility
     ) internal {
         bytes32 depositId = keccak256(
             abi.encode(
@@ -574,7 +574,9 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
      */
     function _handleReceivedMessage(
         uint32 sourceDomain,
-        bytes memory message
+        bytes memory message,
+        // solhint-disable-next-line no-unused-vars
+        bytes memory attestation  // Required by CCTP interface
     ) internal override {
         // Decode message
         (
@@ -643,7 +645,8 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         address vault,
         uint256 shares,
         uint256 minUsdcExpected,
-        uint256 deadline
+        // solhint-disable-next-line no-unused-vars
+        uint256 deadline  // Required for interface compatibility
     ) internal {
         bytes32 withdrawalId = keccak256(
             abi.encode(

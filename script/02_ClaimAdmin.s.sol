@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {RegistryModuleOwnerCustom} from "chainlink/contracts/src/v0.8/ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
-import {USharesToken} from "../../src/USharesToken.sol";
+import {USharesToken} from "../src/USharesToken.sol";
 import {AddressBook} from "./utils/AddressBook.sol";
 import {Config} from "./utils/Config.s.sol";
 
