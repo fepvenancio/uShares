@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28; // Network configuration helper
+pragma solidity 0.8.29; // Network configuration helper
 
 import { AddressBook } from "./utils/AddressBook.sol";
 import { Config } from "./utils/Config.s.sol";

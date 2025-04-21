@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
 import { USharesToken } from "./USharesToken.sol";
 import { IERC4626 } from "./interfaces/IERC4626.sol";
@@ -170,6 +170,19 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
         _initializeOwner(msg.sender);
         _grantRoles(msg.sender, ADMIN_ROLE);
         _grantRoles(address(_cctpTokenMessenger), BRIDGE_ROLE);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    Fallback and Receive Functions
+    //////////////////////////////////////////////////////////////*/
+    // Explicitly reject any Ether sent to the contract
+    fallback() external payable {
+        revert Errors.Fallback();
+    }
+
+    // Explicitly reject any Ether transfered to the contract
+    receive() external payable {
+        revert Errors.CantReceiveETH();
     }
 
     /*//////////////////////////////////////////////////////////////

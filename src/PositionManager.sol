@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
 import { IPositionManager } from "./interfaces/IPositionManager.sol";
 import { IVaultRegistry } from "./interfaces/IVaultRegistry.sol";
@@ -55,6 +55,12 @@ contract PositionManager is IPositionManager, OwnableRoles {
     /// @notice Ensures caller has the HANDLER_ROLE
     modifier onlyHandler() {
         if (!hasAnyRole(msg.sender, HANDLER_ROLE)) revert Errors.NotHandler();
+        _;
+    }
+
+    /// @notice Ensures caller has the ADMIN_ROLE
+    modifier onlyAdmin() {
+        if (!hasAnyRole(msg.sender, ADMIN_ROLE)) revert Errors.NotAdmin();
         _;
     }
 
@@ -212,7 +218,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @param user Address to grant roles to
      * @param roles Roles to grant
      */
-    function grantRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
+    function grantRoles(address user, uint256 roles) public payable override onlyAdmin {
         _grantRoles(user, roles);
     }
 
@@ -222,7 +228,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @param user Address to revoke roles from
      * @param roles Roles to revoke
      */
-    function revokeRoles(address user, uint256 roles) public payable virtual override onlyRoles(ADMIN_ROLE) {
+    function revokeRoles(address user, uint256 roles) public payable override onlyAdmin {
         _removeRoles(user, roles);
     }
 
@@ -232,7 +238,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @param handler Address to configure
      * @param status Handler status to set
      */
-    function configureHandler(address handler, bool status) external onlyRoles(ADMIN_ROLE) {
+    function configureHandler(address handler, bool status) external onlyAdmin {
         Errors.verifyAddress(handler);
         if (status) {
             _grantRoles(handler, HANDLER_ROLE);

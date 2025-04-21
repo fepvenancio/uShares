@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.29;
 
 import "../src/USharesToken.sol";
 import { Client } from "chainlink/contracts/src/v0.8/ccip/libraries/Client.sol";
