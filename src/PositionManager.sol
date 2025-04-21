@@ -35,9 +35,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
     /// @notice Reference to the vault registry contract
     IVaultRegistry public immutable vaultRegistry;
 
-    /// @notice Mapping of addresses to their handler status
-    mapping(address => bool) public handlers;
-
     /// @notice Mapping of position keys to Position structs
     /// @dev Key format: keccak256(abi.encode(owner, sourceChain, destinationChain, destinationVault))
     mapping(bytes32 => DataTypes.Position) public positions;
@@ -47,22 +44,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
 
     /// @notice Mapping of domain ID to token pool address
     mapping(uint32 => address) public domainTokenPools;
-
-    /*//////////////////////////////////////////////////////////////
-                                MODIFIERS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Ensures caller has the HANDLER_ROLE
-    modifier onlyHandler() {
-        if (!hasAnyRole(msg.sender, HANDLER_ROLE)) revert Errors.NotHandler();
-        _;
-    }
-
-    /// @notice Ensures caller has the ADMIN_ROLE
-    modifier onlyAdmin() {
-        if (!hasAnyRole(msg.sender, ADMIN_ROLE)) revert Errors.NotAdmin();
-        _;
-    }
 
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
@@ -102,7 +83,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
         uint256 shares
     )
         external
-        onlyHandler
+        onlyRoles(HANDLER_ROLE)
         returns (bytes32 positionKey)
     {
         // Validate inputs
@@ -145,7 +126,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @param positionKey Unique position identifier
      * @param shares New share amount
      */
-    function updatePosition(bytes32 positionKey, uint256 shares) external onlyHandler {
+    function updatePosition(bytes32 positionKey, uint256 shares) external onlyRoles(HANDLER_ROLE) {
         Errors.verifyBytes32(positionKey);
 
         // Get position
@@ -164,7 +145,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @dev Sets position to inactive and zeros out shares
      * @param positionKey Unique position identifier
      */
-    function closePosition(bytes32 positionKey) external onlyHandler {
+    function closePosition(bytes32 positionKey) external onlyRoles(HANDLER_ROLE) {
         // Validate position exists
         DataTypes.Position storage position = positions[positionKey];
         if (!position.active) revert Errors.PositionNotFound();
@@ -208,44 +189,20 @@ contract PositionManager is IPositionManager, OwnableRoles {
         return userPositions[user].length;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            ROLE MANAGEMENT
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Grants roles to a user
-     * @dev Only callable by admin
-     * @param user Address to grant roles to
-     * @param roles Roles to grant
-     */
-    function grantRoles(address user, uint256 roles) public payable override onlyAdmin {
-        _grantRoles(user, roles);
-    }
-
-    /**
-     * @notice Revokes roles from a user
-     * @dev Only callable by admin
-     * @param user Address to revoke roles from
-     * @param roles Roles to revoke
-     */
-    function revokeRoles(address user, uint256 roles) public payable override onlyAdmin {
-        _removeRoles(user, roles);
-    }
-
     /**
      * @notice Configures handler status for an address
      * @dev Only callable by admin
      * @param handler Address to configure
      * @param status Handler status to set
      */
-    function configureHandler(address handler, bool status) external onlyAdmin {
+    function configureHandler(address handler, bool status) external onlyRoles(ADMIN_ROLE) {
         Errors.verifyAddress(handler);
         if (status) {
             _grantRoles(handler, HANDLER_ROLE);
         } else {
             _removeRoles(handler, HANDLER_ROLE);
         }
-        handlers[handler] = status;
+ 
         emit HandlerConfigured(handler, status);
     }
 

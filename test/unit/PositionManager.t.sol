@@ -10,6 +10,7 @@ import { KeyManager } from "../../src/libraries/KeyManager.sol";
 import { MockVaultRegistry } from "../mocks/MockVaultRegistry.sol";
 import { BaseTest } from "../helpers/BaseTest.sol";
 import { console2 } from "forge-std/Test.sol";
+import { Ownable } from "solady/auth/Ownable.sol";
 
 contract PositionManagerTest is BaseTest, PositionManagerEvents {
     PositionManager public positionManager;
@@ -117,7 +118,7 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
     function test_RevertWhen_NonHandlerCreatesPosition() public {
         vm.startPrank(users.user);
 
-        vm.expectRevert(Errors.NotHandler.selector);
+        vm.expectRevert(Ownable.Unauthorized.selector);
         positionManager.createPosition(users.user, sourceChain, destinationChain, users.vault, initialShares);
 
         vm.stopPrank();
@@ -273,75 +274,6 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
 
         vm.expectRevert(Errors.ZeroAddress.selector);
         positionManager.configureHandler(address(0), true);
-
-        vm.stopPrank();
-    }
-
-    function test_GrantRoles() public {
-        vm.startPrank(users.admin);
-
-        address newAdmin = makeAddr("newAdmin");
-        assertFalse(positionManager.hasAnyRole(newAdmin, positionManager.ADMIN_ROLE()));
-
-        positionManager.grantRoles(newAdmin, positionManager.ADMIN_ROLE());
-        assertTrue(positionManager.hasAnyRole(newAdmin, positionManager.ADMIN_ROLE()));
-
-        vm.stopPrank();
-    }
-
-    function test_RevokeRoles() public {
-        vm.startPrank(users.admin);
-
-        address newAdmin = makeAddr("newAdmin");
-        positionManager.grantRoles(newAdmin, positionManager.ADMIN_ROLE());
-        assertTrue(positionManager.hasAnyRole(newAdmin, positionManager.ADMIN_ROLE()));
-
-        positionManager.revokeRoles(newAdmin, positionManager.ADMIN_ROLE());
-        assertFalse(positionManager.hasAnyRole(newAdmin, positionManager.ADMIN_ROLE()));
-
-        vm.stopPrank();
-    }
-
-    function test_RevertWhen_NonAdminGrantsRoles_banana() public {
-        address haxOr = makeAddr("haxOr");
-        vm.startPrank(haxOr);
-
-        bool isAdmin = positionManager.hasAnyRole(haxOr, positionManager.ADMIN_ROLE());
-        assertEq(isAdmin, false);
-
-        address newAdmin = makeAddr("newAdmin");
-        vm.expectRevert(); // Unauthorized()
-        positionManager.grantRoles(newAdmin, positionManager.ADMIN_ROLE());
-
-        vm.stopPrank();
-    }
-
-    function test_RevertWhen_NonAdminRevokesRoles() public {
-        vm.startPrank(users.user);
-        
-        address newAdmin = makeAddr("newAdmin");
-        vm.expectRevert(); // Unauthorized()
-        positionManager.revokeRoles(newAdmin, positionManager.ADMIN_ROLE());
-
-        vm.stopPrank();
-    }
-
-    function test_ConfigureHandler_RevokeRole() public {
-        vm.startPrank(users.admin);
-
-        // First grant the role
-        address newHandler = makeAddr("newHandler");
-        positionManager.configureHandler(newHandler, true);
-        assertTrue(positionManager.isHandler(newHandler));
-        assertTrue(positionManager.hasAnyRole(newHandler, positionManager.HANDLER_ROLE()));
-
-        // Then revoke it
-        vm.expectEmit(true, true, true, true);
-        emit HandlerConfigured(newHandler, false);
-
-        positionManager.configureHandler(newHandler, false);
-        assertFalse(positionManager.isHandler(newHandler));
-        assertFalse(positionManager.hasAnyRole(newHandler, positionManager.HANDLER_ROLE()));
 
         vm.stopPrank();
     }
