@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.28; // Network configuration helper
 
-import {Script, console} from "forge-std/Script.sol";
-import {Config} from "./utils/Config.s.sol"; // Network configuration helper
-import {TokenPool} from "chainlink/contracts/src/v0.8/ccip/pools/TokenPool.sol";
-import {RateLimiter} from "chainlink/contracts/src/v0.8/ccip/libraries/RateLimiter.sol";
-import {AddressBook} from "./utils/AddressBook.sol";
+import { AddressBook } from "./utils/AddressBook.sol";
+import { Config } from "./utils/Config.s.sol";
+import { RateLimiter } from "chainlink/contracts/src/v0.8/ccip/libraries/RateLimiter.sol";
+import { TokenPool } from "chainlink/contracts/src/v0.8/ccip/pools/TokenPool.sol";
+import { Script, console } from "forge-std/Script.sol";
 
 contract ApplyChainUpdates is Script {
     address tokenAddress;
@@ -64,12 +64,12 @@ contract ApplyChainUpdates is Script {
                 isEnabled: false, // Set to true to enable outbound rate limiting
                 capacity: 0, // Max tokens allowed in the outbound rate limiter
                 rate: 0 // Refill rate per second for the outbound rate limiter
-            }),
+             }),
             inboundRateLimiterConfig: RateLimiter.Config({
                 isEnabled: false, // Set to true to enable inbound rate limiting
                 capacity: 0, // Max tokens allowed in the inbound rate limiter
                 rate: 0 // Refill rate per second for the inbound rate limiter
-            })
+             })
         });
 
         // Create an empty array for chainSelectorRemovals

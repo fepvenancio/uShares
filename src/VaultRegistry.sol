@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
-import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
-import {DataTypes} from "./libraries/DataTypes.sol";
-import {Errors} from "./libraries/Errors.sol";
-import {KeyManager} from "./libraries/KeyManager.sol";
-import {VaultLib} from "./libraries/VaultLib.sol";
-import {IERC4626} from "./interfaces/IERC4626.sol";
+import { IERC4626 } from "./interfaces/IERC4626.sol";
+import { IVaultRegistry } from "./interfaces/IVaultRegistry.sol";
+import { DataTypes } from "./libraries/DataTypes.sol";
+import { Errors } from "./libraries/Errors.sol";
+import { KeyManager } from "./libraries/KeyManager.sol";
+import { VaultLib } from "./libraries/VaultLib.sol";
+import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
 
 /**
  * @title VaultRegistry
@@ -71,10 +71,7 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
      * @param vault The vault address
      * @return Whether the vault is active
      */
-    function _isVaultActive(
-        uint32 domain,
-        address vault
-    ) internal view returns (bool) {
+    function _isVaultActive(uint32 domain, address vault) internal view returns (bool) {
         return vaults[KeyManager.getVaultKey(domain, vault)].isActive;
     }
 
@@ -84,10 +81,7 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
      * @param vault The vault address
      * @return Whether the vault is active
      */
-    function isVaultActive(
-        uint32 domain,
-        address vault
-    ) external view returns (bool) {
+    function isVaultActive(uint32 domain, address vault) external view returns (bool) {
         return _isVaultActive(domain, vault);
     }
 
@@ -96,10 +90,7 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
      * @param domain The domain ID
      * @param vault The vault address
      */
-    function registerVault(
-        uint32 domain,
-        address vault
-    ) external onlyRoles(REGISTRY_ROLE) whenNotPaused {
+    function registerVault(uint32 domain, address vault) external onlyRoles(REGISTRY_ROLE) whenNotPaused {
         Errors.verifyChainId(domain);
         Errors.verifyAddress(vault);
         vault.isUSDCVault(usdc);
@@ -127,7 +118,11 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
         uint32 domain,
         address vault,
         bool active
-    ) external onlyRoles(REGISTRY_ROLE) whenNotPaused {
+    )
+        external
+        onlyRoles(REGISTRY_ROLE)
+        whenNotPaused
+    {
         bytes32 vaultKey = KeyManager.getVaultKey(domain, vault);
         DataTypes.VaultInfo storage vaultInfo = vaults[vaultKey];
         Errors.verifyAddress(vaultInfo.vaultAddress);
@@ -141,10 +136,7 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
      * @param domain The domain ID
      * @param vault The vault address
      */
-    function removeVault(
-        uint32 domain,
-        address vault
-    ) external onlyRoles(REGISTRY_ROLE) whenNotPaused {
+    function removeVault(uint32 domain, address vault) external onlyRoles(REGISTRY_ROLE) whenNotPaused {
         bytes32 vaultKey = KeyManager.getVaultKey(domain, vault);
         DataTypes.VaultInfo memory vaultInfo = vaults[vaultKey];
         Errors.verifyAddress(vaultInfo.vaultAddress);
@@ -160,10 +152,7 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
      * @param vault The vault address
      * @return The vault information
      */
-    function getVaultInfo(
-        uint32 domain,
-        address vault
-    ) external view returns (DataTypes.VaultInfo memory) {
+    function getVaultInfo(uint32 domain, address vault) external view returns (DataTypes.VaultInfo memory) {
         return vaults[KeyManager.getVaultKey(domain, vault)];
     }
 
@@ -172,10 +161,7 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
      * @param domain The domain ID
      * @param tokenPool The token pool address
      */
-    function configureTokenPool(
-        uint32 domain,
-        address tokenPool
-    ) external onlyRoles(REGISTRY_ROLE) whenNotPaused {
+    function configureTokenPool(uint32 domain, address tokenPool) external onlyRoles(REGISTRY_ROLE) whenNotPaused {
         Errors.verifyNumber(domain);
         Errors.verifyAddress(tokenPool);
         domainToTokenPool[domain] = tokenPool;

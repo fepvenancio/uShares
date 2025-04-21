@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {BurnMintERC677} from "chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
-import {Errors} from "./libraries/Errors.sol";
+import { Errors } from "./libraries/Errors.sol";
+import { BurnMintERC677 } from "chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
 
 /**
  * @title USharesToken
@@ -25,7 +25,7 @@ contract USharesToken is BurnMintERC677 {
     uint256 public minAmount = 1e6; // 1 USDC
 
     /// @notice Maximum amount for transactions
-    uint256 public maxAmount = 1000000e6; // 1M USDC
+    uint256 public maxAmount = 1_000_000e6; // 1M USDC
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -61,9 +61,11 @@ contract USharesToken is BurnMintERC677 {
         uint8 decimals_,
         uint256 maxSupply_,
         uint256 preMint
-    ) BurnMintERC677(name_, symbol_, decimals_, maxSupply_) {
+    )
+        BurnMintERC677(name_, symbol_, decimals_, maxSupply_)
+    {
         ccipAdmin = msg.sender;
-        
+
         // Pre-mint initial supply if requested
         if (preMint > 0) {
             _mint(msg.sender, preMint);
@@ -121,7 +123,7 @@ contract USharesToken is BurnMintERC677 {
     function updateLimits(uint256 _minAmount, uint256 _maxAmount) external onlyOwner {
         if (_minAmount == 0 || _maxAmount == 0) revert Errors.InvalidAmount();
         if (_minAmount >= _maxAmount) revert Errors.InvalidConfig();
-        
+
         minAmount = _minAmount;
         maxAmount = _maxAmount;
         emit LimitsUpdated(_minAmount, _maxAmount);
@@ -131,12 +133,7 @@ contract USharesToken is BurnMintERC677 {
                           INTERNAL OVERRIDES
     //////////////////////////////////////////////////////////////*/
 
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 amount
-    ) internal virtual override whenNotPaused {
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override whenNotPaused {
         super._beforeTokenTransfer(from, to, amount);
     }
 }
-

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {ITokenMinter} from "./ITokenMinter.sol";
+import { ITokenMinter } from "./ITokenMinter.sol";
 
 interface ITokenMessenger {
     /// @notice Emitted when a DepositForBurn message is sent
@@ -40,7 +40,9 @@ interface ITokenMessenger {
         bytes32 mintRecipient,
         address burnToken,
         bytes32 destinationCaller
-    ) external returns (uint64 nonce);
+    )
+        external
+        returns (uint64 nonce);
 
     /// Returns the version of the message body format.
     /// @dev immutable
@@ -57,4 +59,3 @@ interface ITokenMessenger {
      */
     function localMinter() external view returns (ITokenMinter);
 }
-

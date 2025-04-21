@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
-import {IVaultRegistry} from "./interfaces/IVaultRegistry.sol";
-import {IPositionManager} from "./interfaces/IPositionManager.sol";
-import {KeyManager} from "./libraries/KeyManager.sol";
-import {Errors} from "./libraries/Errors.sol";
-import {DataTypes} from "./libraries/DataTypes.sol";
+import { IPositionManager } from "./interfaces/IPositionManager.sol";
+import { IVaultRegistry } from "./interfaces/IVaultRegistry.sol";
+
+import { DataTypes } from "./libraries/DataTypes.sol";
+import { Errors } from "./libraries/Errors.sol";
+import { KeyManager } from "./libraries/KeyManager.sol";
+import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
 
 /**
  * @title PositionManager
@@ -23,7 +24,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
 
     /// @notice Role identifier for admin operations
     uint256 public constant ADMIN_ROLE = _ROLE_0;
-    
+
     /// @notice Role identifier for handler operations (creating/updating positions)
     uint256 public constant HANDLER_ROLE = _ROLE_1;
 
@@ -33,7 +34,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
 
     /// @notice Reference to the vault registry contract
     IVaultRegistry public immutable vaultRegistry;
-    
+
     /// @notice Mapping of addresses to their handler status
     mapping(address => bool) public handlers;
 
@@ -65,9 +66,9 @@ contract PositionManager is IPositionManager, OwnableRoles {
     /// @param _vaultRegistry Address of the vault registry contract
     constructor(address _vaultRegistry) {
         Errors.verifyAddress(_vaultRegistry);
-        
+
         vaultRegistry = IVaultRegistry(_vaultRegistry);
-        
+
         _initializeOwner(msg.sender);
         _grantRoles(msg.sender, ADMIN_ROLE);
         _grantRoles(address(this), HANDLER_ROLE);
@@ -93,7 +94,11 @@ contract PositionManager is IPositionManager, OwnableRoles {
         uint32 destinationChain,
         address vault,
         uint256 shares
-    ) external onlyHandler returns (bytes32 positionKey) {
+    )
+        external
+        onlyHandler
+        returns (bytes32 positionKey)
+    {
         // Validate inputs
         Errors.verifyAddress(user);
         Errors.verifyChainId(sourceChain);
@@ -273,7 +278,12 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @param destinationVault Destination vault address
      * @return bytes32 Generated position key
      */
-    function getPositionKey(address owner, uint32 sourceChain, uint32 destinationChain, address destinationVault)
+    function getPositionKey(
+        address owner,
+        uint32 sourceChain,
+        uint32 destinationChain,
+        address destinationVault
+    )
         external
         pure
         returns (bytes32)

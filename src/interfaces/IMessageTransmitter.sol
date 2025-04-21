@@ -14,5 +14,7 @@ interface IMessageTransmitter {
         uint32 destinationDomain,
         bytes32 recipient,
         bytes calldata messageBody
-    ) external returns (uint64);
+    )
+        external
+        returns (uint64);
 }

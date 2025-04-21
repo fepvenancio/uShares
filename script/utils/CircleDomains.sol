@@ -14,4 +14,4 @@ library CircleDomains {
     uint32 public constant BASE = 6;
     uint32 public constant POLYGON = 7;
     uint32 public constant AVALANCHE = 1;
-} 
+}

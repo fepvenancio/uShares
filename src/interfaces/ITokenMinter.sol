@@ -8,4 +8,4 @@ interface ITokenMinter {
      * @return The burn limit
      */
     function burnLimitsPerMessage(address token) external view returns (uint256);
-} 
+}

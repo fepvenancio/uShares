@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IERC20} from "../interfaces/IERC20.sol";
-import {IMessageTransmitter} from "../interfaces/IMessageTransmitter.sol";
-import {ITokenMessenger} from "../interfaces/ITokenMessenger.sol";
-import {ITokenMinter} from "../interfaces/ITokenMinter.sol";
-import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
-import {CircleDomainIds} from "./CircleDomainIds.sol";
-import {IVaultRegistry} from "../interfaces/IVaultRegistry.sol";
-import {IERC4626} from "../interfaces/IERC4626.sol";
+import { IERC20 } from "../interfaces/IERC20.sol";
+
+import { IERC4626 } from "../interfaces/IERC4626.sol";
+import { IMessageTransmitter } from "../interfaces/IMessageTransmitter.sol";
+import { ITokenMessenger } from "../interfaces/ITokenMessenger.sol";
+import { ITokenMinter } from "../interfaces/ITokenMinter.sol";
+import { IVaultRegistry } from "../interfaces/IVaultRegistry.sol";
+import { CircleDomainIds } from "./CircleDomainIds.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 abstract contract CCTPAdapter {
     using SafeTransferLib for address;
@@ -54,7 +55,8 @@ abstract contract CCTPAdapter {
     /**
      * @notice intiailizes the CircleCCTPAdapter contract.
      * @param _usdc USDC address on the current chain.
-     * @param _cctpTokenMessenger TokenMessenger contract to bridge via CCTP. If the zero address is passed, CCTP bridging will be disabled.
+     * @param _cctpTokenMessenger TokenMessenger contract to bridge via CCTP. If the zero address is passed, CCTP
+     * bridging will be disabled.
      * @param _messageTransmitter The message transmitter contract for cross-chain messaging
      * @param _vaultRegistry The vault registry contract
      */
@@ -99,7 +101,9 @@ abstract contract CCTPAdapter {
         address recipient,
         uint256 amount,
         bytes memory depositParams
-    ) internal {
+    )
+        internal
+    {
         _transferUsdcWithMessage(destinationDomain, _toBytes32(recipient), amount, depositParams);
     }
 
@@ -115,7 +119,9 @@ abstract contract CCTPAdapter {
         bytes32 recipient,
         uint256 amount,
         bytes memory depositParams
-    ) internal {
+    )
+        internal
+    {
         // Create deposit parameters struct
         DepositParams memory params;
         params.destinationDomain = destinationDomain;
@@ -123,11 +129,8 @@ abstract contract CCTPAdapter {
         params.amount = amount;
 
         // Decode and validate deposit parameters
-        (
-            params.vault,
-            params.minSharesExpected,
-            params.deadline
-        ) = abi.decode(depositParams, (address, uint256, uint256));
+        (params.vault, params.minSharesExpected, params.deadline) =
+            abi.decode(depositParams, (address, uint256, uint256));
 
         require(params.deadline > block.timestamp, "Invalid deadline");
         require(vaultRegistry.isVaultActive(uint32(block.chainid), params.vault), "Invalid vault");
@@ -161,26 +164,14 @@ abstract contract CCTPAdapter {
      * @param params Deposit parameters
      * @param destinationContract The destination contract address as bytes32
      */
-    function _processSingleTransfer(
-        DepositParams memory params,
-        bytes32 destinationContract
-    ) private {
+    function _processSingleTransfer(DepositParams memory params, bytes32 destinationContract) private {
         uint64 nonce = cctpTokenMessenger.depositForBurnWithCaller(
-            params.amount,
-            params.destinationDomain,
-            destinationContract,
-            address(usdc),
-            destinationContract
+            params.amount, params.destinationDomain, destinationContract, address(usdc), destinationContract
         );
-        
-        bytes memory depositData = abi.encode(
-            params.recipient,
-            params.amount,
-            params.vault,
-            params.minSharesExpected,
-            params.deadline
-        );
-        
+
+        bytes memory depositData =
+            abi.encode(params.recipient, params.amount, params.vault, params.minSharesExpected, params.deadline);
+
         emit MessageSent(nonce, params.destinationDomain, depositData);
     }
 
@@ -194,14 +185,16 @@ abstract contract CCTPAdapter {
         DepositParams memory params,
         uint256 burnLimit,
         bytes32 destinationContract
-    ) private {
+    )
+        private
+    {
         uint256 remaining = params.amount;
         uint256 batchCount = (params.amount + burnLimit - 1) / burnLimit;
         uint64 firstNonce;
 
         for (uint256 i = 0; i < batchCount && remaining > 0;) {
             uint256 batchAmount = remaining > burnLimit ? burnLimit : remaining;
-            
+
             uint64 nonce = cctpTokenMessenger.depositForBurnWithCaller(
                 batchAmount,
                 params.destinationDomain,
@@ -212,18 +205,15 @@ abstract contract CCTPAdapter {
 
             if (i == 0) {
                 firstNonce = nonce;
-                bytes memory depositData = abi.encode(
-                    params.recipient,
-                    params.amount,
-                    params.vault,
-                    params.minSharesExpected,
-                    params.deadline
-                );
+                bytes memory depositData =
+                    abi.encode(params.recipient, params.amount, params.vault, params.minSharesExpected, params.deadline);
                 emit MessageSent(nonce, params.destinationDomain, depositData);
             }
-            
+
             remaining -= batchAmount;
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -237,16 +227,14 @@ abstract contract CCTPAdapter {
         uint32 sourceDomain,
         bytes memory message,
         // solhint-disable-next-line no-unused-vars
-        bytes memory attestation  // Required by interface but unused
-    ) internal virtual {
+        bytes memory attestation // Required by interface but unused
+    )
+        internal
+        virtual
+    {
         // Decode deposit data
-        (
-            bytes32 recipient,
-            uint256 amount,
-            address vault,
-            uint256 minSharesExpected,
-            uint256 deadline
-        ) = abi.decode(message, (bytes32, uint256, address, uint256, uint256));
+        (bytes32 recipient, uint256 amount, address vault, uint256 minSharesExpected, uint256 deadline) =
+            abi.decode(message, (bytes32, uint256, address, uint256, uint256));
 
         // Validate
         require(block.timestamp <= deadline, "Deposit expired");
@@ -259,20 +247,10 @@ abstract contract CCTPAdapter {
         uint256 shares = IERC4626(vault).deposit(amount, address(uint160(uint256(recipient))));
         require(shares >= minSharesExpected, "Insufficient shares");
 
-        emit DepositCompleted(
-            recipient,
-            sourceDomain,
-            vault,
-            amount,
-            shares
-        );
+        emit DepositCompleted(recipient, sourceDomain, vault, amount, shares);
     }
 
     event DepositCompleted(
-        bytes32 indexed recipient,
-        uint32 indexed sourceDomain,
-        address indexed vault,
-        uint256 amount,
-        uint256 shares
+        bytes32 indexed recipient, uint32 indexed sourceDomain, address indexed vault, uint256 amount, uint256 shares
     );
 }
