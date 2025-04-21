@@ -163,6 +163,7 @@ contract UShares is CCTPAdapter, OwnableRoles, ReentrancyGuard {
     )
         CCTPAdapter(_usdc, _cctpTokenMessenger, _messageTransmitter, _vaultRegistry)
     {
+
         uSharesToken = _uSharesToken;
         vaultRegistry = _vaultRegistry;
         positionManager = _positionManager;
