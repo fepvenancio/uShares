@@ -41,6 +41,16 @@ abstract contract CCTPAdapter {
      */
     event MessageReceived(uint64 messageId, uint32 sourceDomain, bytes message);
 
+    /// @notice Struct to hold deposit parameters to avoid stack too deep
+    struct DepositParams {
+        address vault;
+        uint256 minSharesExpected;
+        uint256 deadline;
+        uint256 amount;
+        bytes32 recipient;
+        uint32 destinationDomain;
+    }
+
     /**
      * @notice intiailizes the CircleCCTPAdapter contract.
      * @param _usdc USDC address on the current chain.
@@ -106,51 +116,87 @@ abstract contract CCTPAdapter {
         uint256 amount,
         bytes memory depositParams
     ) internal {
-        // Validate deposit parameters
+        // Create deposit parameters struct
+        DepositParams memory params;
+        params.destinationDomain = destinationDomain;
+        params.recipient = recipient;
+        params.amount = amount;
+
+        // Decode and validate deposit parameters
         (
-            address vault,
-            uint256 minSharesExpected,
-            uint256 deadline
+            params.vault,
+            params.minSharesExpected,
+            params.deadline
         ) = abi.decode(depositParams, (address, uint256, uint256));
 
-        require(deadline > block.timestamp, "Invalid deadline");
-        require(vaultRegistry.isVaultActive(uint32(block.chainid), vault), "Invalid vault");
+        require(params.deadline > block.timestamp, "Invalid deadline");
+        require(vaultRegistry.isVaultActive(uint32(block.chainid), params.vault), "Invalid vault");
 
+        // Process the transfer
+        _processCCTPTransfer(params);
+    }
+
+    /**
+     * @notice Internal function to process CCTP transfer
+     * @param params Deposit parameters
+     */
+    function _processCCTPTransfer(DepositParams memory params) private {
         ITokenMinter cctpMinter = cctpTokenMessenger.localMinter();
         uint256 burnLimit = cctpMinter.burnLimitsPerMessage(address(usdc));
-
-        // Approve USDC for bridge
-        usdc.safeApproveWithRetry(address(cctpTokenMessenger), amount);
-
-        // Always send USDC to our contract on destination
         bytes32 destinationContract = _toBytes32(address(this));
 
-        // If amount is less than burn limit, transfer in one go
-        if (amount <= burnLimit) {
-            uint64 nonce = cctpTokenMessenger.depositForBurnWithCaller(
-                amount,
-                destinationDomain,
-                destinationContract,  // Send to our contract
-                address(usdc),
-                destinationContract   // Only our contract can process
-            );
-            
-            // Encode full deposit data
-            bytes memory depositData = abi.encode(
-                recipient,           // Original recipient
-                amount,
-                vault,
-                minSharesExpected,
-                deadline
-            );
-            
-            emit MessageSent(nonce, destinationDomain, depositData);
+        // Approve USDC for bridge
+        usdc.safeApproveWithRetry(address(cctpTokenMessenger), params.amount);
+
+        if (params.amount <= burnLimit) {
+            _processSingleTransfer(params, destinationContract);
             return;
         }
 
-        // Handle larger amounts in batches
-        uint256 remaining = amount;
-        uint256 batchCount = (amount + burnLimit - 1) / burnLimit;
+        _processBatchTransfer(params, burnLimit, destinationContract);
+    }
+
+    /**
+     * @notice Process a single CCTP transfer
+     * @param params Deposit parameters
+     * @param destinationContract The destination contract address as bytes32
+     */
+    function _processSingleTransfer(
+        DepositParams memory params,
+        bytes32 destinationContract
+    ) private {
+        uint64 nonce = cctpTokenMessenger.depositForBurnWithCaller(
+            params.amount,
+            params.destinationDomain,
+            destinationContract,
+            address(usdc),
+            destinationContract
+        );
+        
+        bytes memory depositData = abi.encode(
+            params.recipient,
+            params.amount,
+            params.vault,
+            params.minSharesExpected,
+            params.deadline
+        );
+        
+        emit MessageSent(nonce, params.destinationDomain, depositData);
+    }
+
+    /**
+     * @notice Process a batch CCTP transfer
+     * @param params Deposit parameters
+     * @param burnLimit The burn limit per message
+     * @param destinationContract The destination contract address as bytes32
+     */
+    function _processBatchTransfer(
+        DepositParams memory params,
+        uint256 burnLimit,
+        bytes32 destinationContract
+    ) private {
+        uint256 remaining = params.amount;
+        uint256 batchCount = (params.amount + burnLimit - 1) / burnLimit;
         uint64 firstNonce;
 
         for (uint256 i = 0; i < batchCount && remaining > 0;) {
@@ -158,23 +204,22 @@ abstract contract CCTPAdapter {
             
             uint64 nonce = cctpTokenMessenger.depositForBurnWithCaller(
                 batchAmount,
-                destinationDomain,
-                destinationContract,  // Send to our contract
+                params.destinationDomain,
+                destinationContract,
                 address(usdc),
-                i == 0 ? destinationContract : bytes32(0)  // Only first batch restricted
+                i == 0 ? destinationContract : bytes32(0)
             );
 
             if (i == 0) {
                 firstNonce = nonce;
-                // Encode full deposit data only in first batch
                 bytes memory depositData = abi.encode(
-                    recipient,
-                    amount,  // Total amount
-                    vault,
-                    minSharesExpected,
-                    deadline
+                    params.recipient,
+                    params.amount,
+                    params.vault,
+                    params.minSharesExpected,
+                    params.deadline
                 );
-                emit MessageSent(nonce, destinationDomain, depositData);
+                emit MessageSent(nonce, params.destinationDomain, depositData);
             }
             
             remaining -= batchAmount;
