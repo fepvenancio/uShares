@@ -1,12 +1,14 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.29;
 
 import { IERC4626 } from "./interfaces/IERC4626.sol";
 import { IVaultRegistry } from "./interfaces/IVaultRegistry.sol";
-import { DataTypes } from "./libraries/DataTypes.sol";
-import { Errors } from "./libraries/Errors.sol";
-import { KeyManager } from "./libraries/KeyManager.sol";
+
 import { VaultLib } from "./libraries/VaultLib.sol";
+import { Errors } from "./libraries/core/Errors.sol";
+import { KeyManager } from "./libraries/core/KeyManager.sol";
+import { DataTypes } from "./libraries/types/DataTypes.sol";
+
 import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
 
 /**

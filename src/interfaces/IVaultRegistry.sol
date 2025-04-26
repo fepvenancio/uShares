@@ -1,14 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { DataTypes } from "../libraries/DataTypes.sol";
+import { DataTypes } from "../libraries/types/DataTypes.sol";
 
 interface IVaultRegistry {
-    event VaultRegistered(uint32 indexed domain, address indexed vault);
-    event VaultUpdated(uint32 indexed domain, address indexed vault, bool active);
-    event VaultRemoved(uint32 indexed domain, address indexed vault);
-    event TokenPoolConfigured(uint32 indexed domain, address indexed tokenPool);
-
     /**
      * @notice Register a new vault
      * @param domain The domain ID

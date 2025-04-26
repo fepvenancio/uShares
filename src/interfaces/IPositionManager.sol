@@ -1,24 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { DataTypes } from "../libraries/DataTypes.sol";
+import { DataTypes } from "../libraries/types/DataTypes.sol";
 
 interface IPositionManager {
-    // Events
-    event PositionCreated(
-        address indexed user,
-        uint32 indexed sourceChain,
-        uint32 indexed destinationChain,
-        address destinationVault,
-        uint256 shares
-    );
-
-    event PositionUpdated(bytes32 indexed positionKey, uint256 newShares, uint256 timestamp);
-
-    event PositionClosed(bytes32 indexed positionKey);
-
-    event HandlerConfigured(address indexed handler, bool status);
-
     // Functions
     function configureHandler(address handler, bool status) external;
 

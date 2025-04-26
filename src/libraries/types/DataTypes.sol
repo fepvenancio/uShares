@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
+import { Constants } from "../core/Constants.sol";
+
 /**
  * @title DataTypes
  * @notice Library containing data types used in the UShares protocol
@@ -17,16 +19,6 @@ library DataTypes {
     }
 
     /**
-     * @notice Status of a cross-chain operation
-     */
-    enum CrossChainStatus {
-        None,
-        Pending,
-        Completed,
-        Failed
-    }
-
-    /**
      * @notice Data structure for cross-chain deposits
      */
     struct CrossChainDeposit {
@@ -35,7 +27,7 @@ library DataTypes {
         uint32 destinationDomain;
         address targetVault;
         uint256 deadline;
-        CrossChainStatus status;
+        Constants.CrossChainStatus status;
         bool cctpCompleted;
     }
 
@@ -48,7 +40,7 @@ library DataTypes {
         uint32 destinationDomain;
         address targetVault;
         uint256 deadline;
-        CrossChainStatus status;
+        Constants.CrossChainStatus status;
         bool cctpCompleted;
     }
 

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-contract PositionManagerEvents {    
-    
+contract PositionManagerEvents {
     event PositionCreated(
         address indexed user,
         uint32 indexed sourceChain,

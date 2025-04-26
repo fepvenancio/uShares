@@ -4,9 +4,9 @@ pragma solidity 0.8.29;
 import { IPositionManager } from "./interfaces/IPositionManager.sol";
 import { IVaultRegistry } from "./interfaces/IVaultRegistry.sol";
 
-import { DataTypes } from "./libraries/DataTypes.sol";
-import { Errors } from "./libraries/Errors.sol";
-import { KeyManager } from "./libraries/KeyManager.sol";
+import { Errors } from "./libraries/core/Errors.sol";
+import { KeyManager } from "./libraries/core/KeyManager.sol";
+import { DataTypes } from "./libraries/types/DataTypes.sol";
 import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
 
 /**
@@ -202,7 +202,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
         } else {
             _removeRoles(handler, HANDLER_ROLE);
         }
- 
+
         emit HandlerConfigured(handler, status);
     }
 

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { Test, Vm } from "forge-std/Test.sol";
-import { Utils } from "./Utils.sol";
 import { getTokensList } from "./Tokens.sol";
+import { Utils } from "./Utils.sol";
+import { Test, Vm } from "forge-std/Test.sol";
 
 contract BaseTest is Test {
     struct Users {
@@ -27,7 +27,7 @@ contract BaseTest is Test {
     uint256 public relayerKey;
 
     function _setUp(string memory chain, uint256 forkBlock) internal virtual {
-         if (vm.envOr("FORK", false)) {
+        if (vm.envOr("FORK", false)) {
             string memory rpc = vm.envString(string.concat("RPC_", chain));
             chainFork = vm.createSelectFork(rpc);
             vm.rollFork(forkBlock);
@@ -60,7 +60,10 @@ contract BaseTest is Test {
         uint256 a,
         uint256 b,
         uint256 maxPercentDelta // An 18 decimal fixed point number, where 1e18 == 100%
-    ) internal virtual {
+    )
+        internal
+        virtual
+    {
         if (b == 0) return assertEq(a, b); // If the expected is 0, actual must be too.
 
         uint256 percentDelta = ((a > b ? a - b : b - a) * 1e18) / b;
@@ -95,4 +98,4 @@ contract BaseTest is Test {
             return a - b > a ? 0 : a - b;
         }
     }
-} 
+}

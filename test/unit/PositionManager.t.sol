@@ -2,13 +2,16 @@
 pragma solidity 0.8.29;
 
 import { PositionManager } from "../../src/PositionManager.sol";
-import { PositionManagerEvents } from "../mocks/PositionManagerEvents.sol";
+
 import { IVaultRegistry } from "../../src/interfaces/IVaultRegistry.sol";
 import { DataTypes } from "../../src/libraries/DataTypes.sol";
 import { Errors } from "../../src/libraries/Errors.sol";
 import { KeyManager } from "../../src/libraries/KeyManager.sol";
-import { MockVaultRegistry } from "../mocks/MockVaultRegistry.sol";
+
 import { BaseTest } from "../helpers/BaseTest.sol";
+import { MockVaultRegistry } from "../mocks/MockVaultRegistry.sol";
+import { PositionManagerEvents } from "../mocks/PositionManagerEvents.sol";
+
 import { console2 } from "forge-std/Test.sol";
 import { Ownable } from "solady/auth/Ownable.sol";
 
@@ -17,7 +20,7 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
     MockVaultRegistry public vaultRegistry;
 
     function setUp() public {
-        super._setUp("BASE", 29200000);
+        super._setUp("BASE", 29_200_000);
         vm.startPrank(users.admin);
 
         // Deploy contracts
@@ -46,7 +49,8 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
         vm.expectEmit(true, true, true, true);
         emit PositionCreated(users.user, sourceChain, destinationChain, users.vault, initialShares);
 
-        bytes32 positionKey = positionManager.createPosition(users.user, sourceChain, destinationChain, users.vault, initialShares);
+        bytes32 positionKey =
+            positionManager.createPosition(users.user, sourceChain, destinationChain, users.vault, initialShares);
 
         assertEq(positionKey, expectedKey);
 
@@ -65,7 +69,8 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
         vm.startPrank(users.handler);
 
         // Create position first
-        bytes32 positionKey = positionManager.createPosition(users.user, sourceChain, destinationChain, users.vault, initialShares);
+        bytes32 positionKey =
+            positionManager.createPosition(users.user, sourceChain, destinationChain, users.vault, initialShares);
 
         uint256 newShares = 2000;
 
@@ -84,7 +89,8 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
         vm.startPrank(users.handler);
 
         // Create position first
-        bytes32 positionKey = positionManager.createPosition(users.user, sourceChain, destinationChain, users.vault, initialShares);
+        bytes32 positionKey =
+            positionManager.createPosition(users.user, sourceChain, destinationChain, users.vault, initialShares);
 
         vm.expectEmit(true, true, true, true);
         emit PositionClosed(positionKey);
@@ -102,7 +108,8 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
         vm.startPrank(users.handler);
 
         // Create multiple positions
-        bytes32 positionKey1 = positionManager.createPosition(users.user, sourceChain, destinationChain, users.vault, initialShares);
+        bytes32 positionKey1 =
+            positionManager.createPosition(users.user, sourceChain, destinationChain, users.vault, initialShares);
 
         bytes32 positionKey2 =
             positionManager.createPosition(users.user, sourceChain, destinationChain + 1, users.vault, initialShares);
@@ -205,7 +212,8 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
         vm.startPrank(users.handler);
 
         // Create position
-        bytes32 positionKey = positionManager.createPosition(users.user, sourceChain, destinationChain, users.vault, initialShares);
+        bytes32 positionKey =
+            positionManager.createPosition(users.user, sourceChain, destinationChain, users.vault, initialShares);
 
         assertTrue(positionManager.isPositionActive(positionKey));
 

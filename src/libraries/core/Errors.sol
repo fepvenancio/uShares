@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.29;
 
 /**
@@ -12,6 +12,7 @@ library Errors {
                             ACCESS CONTROL ERRORS
     //////////////////////////////////////////////////////////////*/
 
+    error RMAdminZeroAddress();
     /// @notice Thrown when caller is not the owner
     error NotOwner();
     /// @notice Thrown when caller is not a handler
@@ -147,4 +148,26 @@ library Errors {
     function verifyIfActive(bool isActive) internal pure {
         if (!isActive) revert VaultNotActive();
     }
+
+    /**
+     * @notice Verifies that a number is not zero
+     * @dev Reverts with InvalidAmount if number is zero
+     * @param value Number to verify
+     */
+    function verifyNotZero(uint256 value) internal pure {
+        if (value == 0) revert InvalidAmount();
+    }
+
+    // Common errors
+    error InvalidAddress(address addr);
+    error InvalidDomain(uint32 domain);
+    error InvalidLength(uint256 length);
+    error InvalidSignature();
+    error AlreadyInitialized();
+    error NotInitialized();
+    error InvalidState();
+    error InvalidInput();
+    error InvalidOperation();
+    error OperationFailed();
+    error ContractNotFound();
 }

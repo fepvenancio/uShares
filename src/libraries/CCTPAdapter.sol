@@ -8,7 +8,7 @@ import { IMessageTransmitter } from "../interfaces/IMessageTransmitter.sol";
 import { ITokenMessenger } from "../interfaces/ITokenMessenger.sol";
 import { ITokenMinter } from "../interfaces/ITokenMinter.sol";
 import { IVaultRegistry } from "../interfaces/IVaultRegistry.sol";
-import { CircleDomainIds } from "./CircleDomainIds.sol";
+import { Constants } from "./core/Constants.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 abstract contract CCTPAdapter {
