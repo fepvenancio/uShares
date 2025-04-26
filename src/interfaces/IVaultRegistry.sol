@@ -41,6 +41,4 @@ interface IVaultRegistry {
      * @return Whether the vault is active
      */
     function isVaultActive(uint32 domain, address vault) external view returns (bool);
-
-    function configureTokenPool(uint32 domain, address tokenPool) external;
 }

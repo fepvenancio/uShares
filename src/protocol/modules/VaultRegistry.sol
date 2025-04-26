@@ -1,45 +1,28 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.29;
 
-import { IERC4626 } from "./interfaces/IERC4626.sol";
-import { IVaultRegistry } from "./interfaces/IVaultRegistry.sol";
+import { IERC4626 } from "../../interfaces/IERC4626.sol";
+import { IVaultRegistry } from "../../interfaces/IVaultRegistry.sol";
 
-import { VaultLib } from "./libraries/VaultLib.sol";
-import { Errors } from "./libraries/core/Errors.sol";
-import { KeyManager } from "./libraries/core/KeyManager.sol";
-import { DataTypes } from "./libraries/types/DataTypes.sol";
-
-import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
+import { Errors } from "../../libraries/core/Errors.sol";
+import { KeyManager } from "../../libraries/logic/KeyManager.sol";
+import { VaultLib } from "../../libraries/logic/VaultLib.sol";
+import { DataTypes } from "../../libraries/types/DataTypes.sol";
+import { BaseModule } from "../../libraries/base/BaseModule.sol";
+import { Events } from "../../libraries/core/Events.sol";
 
 /**
  * @title VaultRegistry
  * @notice Registry for tracking vaults and their shares across chains
  */
-contract VaultRegistry is IVaultRegistry, OwnableRoles {
+contract VaultRegistry is BaseModule, IVaultRegistry {
     using VaultLib for address;
-
-    /*//////////////////////////////////////////////////////////////
-                                CONSTANTS
-    //////////////////////////////////////////////////////////////*/
-
-    uint256 internal constant ADMIN_ROLE = _ROLE_0;
-    uint256 internal constant REGISTRY_ROLE = _ROLE_1;
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice The USDC token contract
-    address public immutable usdc;
-
     /// @notice Whether the contract is paused
     bool public paused;
-
-    /// @notice Mapping of vault key to vault info
-    mapping(bytes32 => DataTypes.VaultInfo) public vaults;
-
-    /// @notice Mapping of domain to token pool
-    mapping(uint32 => address) public domainToTokenPool;
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -54,14 +37,7 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address _usdc) {
-        Errors.verifyAddress(_usdc);
-        usdc = _usdc;
-
-        _initializeOwner(msg.sender);
-        _grantRoles(msg.sender, ADMIN_ROLE);
-        _grantRoles(msg.sender, REGISTRY_ROLE);
-    }
+    constructor(uint256 moduleId_, bytes32 moduleVersion_) BaseModule(moduleId_, moduleVersion_) {}
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -92,10 +68,10 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
      * @param domain The domain ID
      * @param vault The vault address
      */
-    function registerVault(uint32 domain, address vault) external onlyRoles(REGISTRY_ROLE) whenNotPaused {
+    function registerVault(uint32 domain, address vault) external onlyRegistry whenNotPaused {
         Errors.verifyChainId(domain);
         Errors.verifyAddress(vault);
-        vault.isUSDCVault(usdc);
+        vault.isUSDCVault(_usdc);
 
         bytes32 vaultKey = KeyManager.getVaultKey(domain, vault);
         Errors.verifyAddress(vaults[vaultKey].vaultAddress);
@@ -107,7 +83,7 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
             isActive: true
         });
 
-        emit VaultRegistered(domain, vault);
+        emit Events.VaultRegistered(domain, vault);
     }
 
     /**
@@ -122,7 +98,7 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
         bool active
     )
         external
-        onlyRoles(REGISTRY_ROLE)
+        onlyRegistry
         whenNotPaused
     {
         bytes32 vaultKey = KeyManager.getVaultKey(domain, vault);
@@ -130,7 +106,7 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
         Errors.verifyAddress(vaultInfo.vaultAddress);
 
         vaultInfo.isActive = active;
-        emit VaultUpdated(domain, vault, active);
+        emit Events.VaultUpdated(domain, vault, active);
     }
 
     /**
@@ -138,14 +114,14 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
      * @param domain The domain ID
      * @param vault The vault address
      */
-    function removeVault(uint32 domain, address vault) external onlyRoles(REGISTRY_ROLE) whenNotPaused {
+    function removeVault(uint32 domain, address vault) external onlyRegistry whenNotPaused {
         bytes32 vaultKey = KeyManager.getVaultKey(domain, vault);
         DataTypes.VaultInfo memory vaultInfo = vaults[vaultKey];
         Errors.verifyAddress(vaultInfo.vaultAddress);
         Errors.verifyIfActive(vaultInfo.isActive);
 
         delete vaults[vaultKey];
-        emit VaultRemoved(domain, vault);
+        emit Events.VaultRemoved(domain, vault);
     }
 
     /**
@@ -156,17 +132,5 @@ contract VaultRegistry is IVaultRegistry, OwnableRoles {
      */
     function getVaultInfo(uint32 domain, address vault) external view returns (DataTypes.VaultInfo memory) {
         return vaults[KeyManager.getVaultKey(domain, vault)];
-    }
-
-    /**
-     * @notice Configure token pool for a domain
-     * @param domain The domain ID
-     * @param tokenPool The token pool address
-     */
-    function configureTokenPool(uint32 domain, address tokenPool) external onlyRoles(REGISTRY_ROLE) whenNotPaused {
-        Errors.verifyNumber(domain);
-        Errors.verifyAddress(tokenPool);
-        domainToTokenPool[domain] = tokenPool;
-        emit TokenPoolConfigured(domain, tokenPool);
     }
 }

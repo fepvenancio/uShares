@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { PositionManager } from "../../src/PositionManager.sol";
-
+import { PositionManager } from "../../src/protocol/modules/PositionManager.sol";
 import { IVaultRegistry } from "../../src/interfaces/IVaultRegistry.sol";
-import { DataTypes } from "../../src/libraries/DataTypes.sol";
-import { Errors } from "../../src/libraries/Errors.sol";
-import { KeyManager } from "../../src/libraries/KeyManager.sol";
-
+import { Errors } from "../../src/libraries/core/Errors.sol";
+import { KeyManager } from "../../src/libraries/logic/KeyManager.sol";
+import { DataTypes } from "../../src/libraries/types/DataTypes.sol";
+import { Constants } from "../../src/libraries/core/Constants.sol";
+import { Events } from "../../src/libraries/core/Events.sol";
 import { BaseTest } from "../helpers/BaseTest.sol";
 import { MockVaultRegistry } from "../mocks/MockVaultRegistry.sol";
 import { PositionManagerEvents } from "../mocks/PositionManagerEvents.sol";
+import { RolesManager } from "../../src/libraries/core/RolesManager.sol";
 
 import { console2 } from "forge-std/Test.sol";
 import { Ownable } from "solady/auth/Ownable.sol";
@@ -18,6 +19,10 @@ import { Ownable } from "solady/auth/Ownable.sol";
 contract PositionManagerTest is BaseTest, PositionManagerEvents {
     PositionManager public positionManager;
     MockVaultRegistry public vaultRegistry;
+    RolesManager public rolesManager;
+    // Constants for module initialization
+    uint256 constant POSITION_MANAGER_MODULE_ID = 1;
+    bytes32 constant POSITION_MANAGER_VERSION = "1.0.0";
 
     function setUp() public {
         super._setUp("BASE", 29_200_000);
@@ -25,20 +30,19 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
 
         // Deploy contracts
         vaultRegistry = new MockVaultRegistry();
-        positionManager = new PositionManager(address(vaultRegistry));
-
+        positionManager = new PositionManager(POSITION_MANAGER_MODULE_ID, POSITION_MANAGER_VERSION);
+        rolesManager = new RolesManager(users.admin);
         // Set up vault and handler
         vaultRegistry.updateVaultStatus(destinationChain, users.vault, true);
         vaultRegistry.updateVaultStatus(destinationChain + 1, users.vault, true);
-        positionManager.configureHandler(users.handler, true);
 
         vm.stopPrank();
     }
 
     function test_Constructor() public {
-        assertEq(address(positionManager.vaultRegistry()), address(vaultRegistry));
-        assertTrue(positionManager.hasAnyRole(users.admin, positionManager.ADMIN_ROLE()));
-        assertTrue(positionManager.hasAnyRole(address(positionManager), positionManager.HANDLER_ROLE()));
+        assertEq(positionManager.moduleId(), POSITION_MANAGER_MODULE_ID);
+        assertEq(positionManager.moduleVersion(), POSITION_MANAGER_VERSION);
+        assertTrue(rolesManager.hasAnyRole(users.admin, rolesManager.ROLES_MANAGER_ROLE()));
     }
 
     function test_CreatePosition() public {
@@ -177,37 +181,6 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
         vm.stopPrank();
     }
 
-    function test_ConfigureHandler() public {
-        vm.startPrank(users.admin);
-
-        address newHandler = makeAddr("newHandler");
-
-        vm.expectEmit(true, true, true, true);
-        emit HandlerConfigured(newHandler, true);
-
-        positionManager.configureHandler(newHandler, true);
-        assertTrue(positionManager.isHandler(newHandler));
-
-        vm.expectEmit(true, true, true, true);
-        emit HandlerConfigured(newHandler, false);
-
-        positionManager.configureHandler(newHandler, false);
-        assertFalse(positionManager.isHandler(newHandler));
-
-        vm.stopPrank();
-    }
-
-    function test_RevertWhen_NonAdminConfiguresHandler() public {
-        vm.startPrank(users.user);
-
-        address newHandler = makeAddr("newHandler");
-
-        vm.expectRevert(); // Will revert with OwnableRoles error
-        positionManager.configureHandler(newHandler, true);
-
-        vm.stopPrank();
-    }
-
     function test_IsPositionActive() public {
         vm.startPrank(users.handler);
 
@@ -273,15 +246,6 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
 
         vm.expectRevert(Errors.ZeroChainId.selector);
         positionManager.createPosition(users.user, sourceChain, 0, users.vault, initialShares);
-
-        vm.stopPrank();
-    }
-
-    function test_RevertWhen_ZeroAddressHandler() public {
-        vm.startPrank(users.admin);
-
-        vm.expectRevert(Errors.ZeroAddress.selector);
-        positionManager.configureHandler(address(0), true);
 
         vm.stopPrank();
     }

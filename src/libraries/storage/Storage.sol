@@ -3,15 +3,15 @@ pragma solidity ^0.8.19;
 
 import { Constants } from "../core/Constants.sol";
 
-import { RolesManager } from "../roles/RolesManager.sol";
+import { RolesManager } from "../core/RolesManager.sol";
 import { DataTypes } from "../types/DataTypes.sol";
 
 /**
- * @title CoreStorage
+ * @title Storage
  * @author Unlockd
  * @notice Storage of the route context for the modules
  */
-abstract contract CoreStorage {
+abstract contract Storage {
     /////////////////////////////////////////
     //  Dispacher and Upgrades
     /////////////////////////////////////////
@@ -31,14 +31,16 @@ abstract contract CoreStorage {
 
     // ROLES MANAGER ADDRESS
     address internal _rolesManager;
+    // VAULT REGISTRY ADDRESS
+    address internal _vaultRegistry;
     // ORACLE ADDRESS
     address internal _usdcOracle;
+    // USDC Address
+    address internal _usdc;
     // SIGNED ADDRESS
     address internal _signer;
     // ERC1155 to mint to users
     address internal _safeERC1155;
-    // USDC Address
-    address internal _usdc;
 
     /////////////////////////////////////////
     //  Signature Logic
@@ -49,14 +51,6 @@ abstract contract CoreStorage {
     //  Allowed Vaults
     /////////////////////////////////////////
 
-    mapping(address => Constants.ReserveType) internal _allowedVaults;
-
-    /////////////////////////////////////////
-    //  Data Structs
-    /////////////////////////////////////////
-
-    mapping(bytes32 => DataTypes.Loan) internal _loans;
-    mapping(bytes32 => DataTypes.Order) internal _orders;
-
-    /////////////////////////////////////////
+    /// @notice Mapping of vault key to vault info
+    mapping(bytes32 => DataTypes.VaultInfo) public vaults;
 }

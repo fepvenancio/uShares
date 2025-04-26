@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { Errors } from "../../src/libraries/Errors.sol";
-import { RolesManager } from "../../src/libraries/roles/RolesManager.sol";
+import { Errors } from "../../src/libraries/core/Errors.sol";
+import { RolesManager } from "../../src/libraries/core/RolesManager.sol";
 import { BaseTest } from "../helpers/BaseTest.sol";
 
 contract RolesManagerTest is BaseTest {

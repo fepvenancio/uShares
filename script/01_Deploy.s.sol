@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import "../src/USharesToken.sol";
+import "../src/protocol/USharesToken.sol";
 import "forge-std/Script.sol";
 
 contract Deploy is Script {

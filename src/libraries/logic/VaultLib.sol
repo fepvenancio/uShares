@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { IERC4626 } from "../interfaces/IERC4626.sol";
-import { Errors } from "./core/Errors.sol";
+import { IERC4626 } from "../../interfaces/IERC4626.sol";
+import { Errors } from "../core/Errors.sol";
 
 library VaultLib {
     function convertToAssets(address _vault, uint256 _shares) internal view returns (uint256) {
@@ -18,7 +18,7 @@ library VaultLib {
     }
 
     function getSharePrice(address _vault) internal view returns (uint256) {
-        return IERC4626(_vault).convertToAssets(1 ** getDecimals(_vault));
+        return IERC4626(_vault).convertToAssets(10 ** getDecimals(_vault));
     }
 
     function isUSDCVault(address _usdc, address _vault) internal view {

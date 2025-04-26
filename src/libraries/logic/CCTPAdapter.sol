@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { IERC20 } from "../interfaces/IERC20.sol";
+import { IERC20 } from "../../interfaces/IERC20.sol";
 
-import { IERC4626 } from "../interfaces/IERC4626.sol";
-import { IMessageTransmitter } from "../interfaces/IMessageTransmitter.sol";
-import { ITokenMessenger } from "../interfaces/ITokenMessenger.sol";
-import { ITokenMinter } from "../interfaces/ITokenMinter.sol";
-import { IVaultRegistry } from "../interfaces/IVaultRegistry.sol";
-import { Constants } from "./core/Constants.sol";
+import { IERC4626 } from "../../interfaces/IERC4626.sol";
+import { IMessageTransmitter } from "../../interfaces/IMessageTransmitter.sol";
+import { ITokenMessenger } from "../../interfaces/ITokenMessenger.sol";
+import { ITokenMinter } from "../../interfaces/ITokenMinter.sol";
+import { IVaultRegistry } from "../../interfaces/IVaultRegistry.sol";
+import { Constants } from "../core/Constants.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 abstract contract CCTPAdapter {

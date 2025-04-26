@@ -2,7 +2,9 @@
 pragma solidity 0.8.29;
 
 import { IVaultRegistry } from "../../src/interfaces/IVaultRegistry.sol";
-import { DataTypes } from "../../src/libraries/DataTypes.sol";
+
+import { Events } from "../../src/libraries/core/Events.sol";
+import { DataTypes } from "../../src/libraries/types/DataTypes.sol";
 
 contract MockVaultRegistry is IVaultRegistry {
     mapping(uint32 => mapping(address => bool)) public vaultStatus;
@@ -17,19 +19,19 @@ contract MockVaultRegistry is IVaultRegistry {
             isActive: true
         });
         vaultStatus[domain][vault] = true;
-        emit VaultRegistered(domain, vault);
+        emit Events.VaultRegistered(domain, vault);
     }
 
     function updateVaultStatus(uint32 domain, address vault, bool active) external {
         vaultInfo[domain][vault].isActive = active;
         vaultStatus[domain][vault] = active;
-        emit VaultUpdated(domain, vault, active);
+        emit Events.VaultUpdated(domain, vault, active);
     }
 
     function removeVault(uint32 domain, address vault) external {
         delete vaultInfo[domain][vault];
         delete vaultStatus[domain][vault];
-        emit VaultRemoved(domain, vault);
+        emit Events.VaultRemoved(domain, vault);
     }
 
     function getVaultInfo(uint32 domain, address vault) external view returns (DataTypes.VaultInfo memory) {
@@ -42,6 +44,6 @@ contract MockVaultRegistry is IVaultRegistry {
 
     function configureTokenPool(uint32 domain, address tokenPool) external {
         tokenPools[domain] = tokenPool;
-        emit TokenPoolConfigured(domain, tokenPool);
+        emit Events.TokenPoolConfigured(domain, tokenPool);
     }
 }

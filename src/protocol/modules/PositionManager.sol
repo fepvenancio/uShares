@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { IPositionManager } from "./interfaces/IPositionManager.sol";
-import { IVaultRegistry } from "./interfaces/IVaultRegistry.sol";
-
-import { Errors } from "./libraries/core/Errors.sol";
-import { KeyManager } from "./libraries/core/KeyManager.sol";
-import { DataTypes } from "./libraries/types/DataTypes.sol";
-import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
+import { IPositionManager } from "../../interfaces/IPositionManager.sol";
+import { IVaultRegistry } from "../../interfaces/IVaultRegistry.sol";
+import { BaseModule } from "../../libraries/base/BaseModule.sol";
+import { Errors } from "../../libraries/core/Errors.sol";
+import { Events } from "../../libraries/core/Events.sol";
+import { KeyManager } from "../../libraries/logic/KeyManager.sol";
+import { DataTypes } from "../../libraries/types/DataTypes.sol";
 
 /**
  * @title PositionManager
@@ -15,25 +15,12 @@ import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
  * @dev Tracks and manages user positions in cross-chain vaults
  * @custom:security-contact security@ushares.com
  */
-contract PositionManager is IPositionManager, OwnableRoles {
+contract PositionManager is BaseModule, IPositionManager {
     using KeyManager for *;
-
-    /*//////////////////////////////////////////////////////////////
-                                CONSTANTS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Role identifier for admin operations
-    uint256 public constant ADMIN_ROLE = _ROLE_0;
-
-    /// @notice Role identifier for handler operations (creating/updating positions)
-    uint256 public constant HANDLER_ROLE = _ROLE_1;
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice Reference to the vault registry contract
-    IVaultRegistry public immutable vaultRegistry;
 
     /// @notice Mapping of position keys to Position structs
     /// @dev Key format: keccak256(abi.encode(owner, sourceChain, destinationChain, destinationVault))
@@ -42,24 +29,12 @@ contract PositionManager is IPositionManager, OwnableRoles {
     /// @notice Mapping of user addresses to their position keys
     mapping(address => bytes32[]) public userPositions;
 
-    /// @notice Mapping of domain ID to token pool address
-    mapping(uint32 => address) public domainTokenPools;
-
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Initializes the PositionManager contract
-    /// @param _vaultRegistry Address of the vault registry contract
-    constructor(address _vaultRegistry) {
-        Errors.verifyAddress(_vaultRegistry);
-
-        vaultRegistry = IVaultRegistry(_vaultRegistry);
-
-        _initializeOwner(msg.sender);
-        _grantRoles(msg.sender, ADMIN_ROLE);
-        _grantRoles(address(this), HANDLER_ROLE);
-    }
+    constructor(uint256 moduleId_, bytes32 moduleVersion_) BaseModule(moduleId_, moduleVersion_) {}
 
     /*//////////////////////////////////////////////////////////////
                             POSITION MANAGEMENT
@@ -83,7 +58,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
         uint256 shares
     )
         external
-        onlyRoles(HANDLER_ROLE)
+        onlyHandler
         returns (bytes32 positionKey)
     {
         // Validate inputs
@@ -93,7 +68,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
         Errors.verifyAddress(vault);
 
         // Validate vault is active
-        if (!vaultRegistry.isVaultActive(destinationChain, vault)) {
+        if (!IVaultRegistry(_vaultRegistry).isVaultActive(destinationChain, vault)) {
             revert Errors.VaultNotActive();
         }
 
@@ -117,7 +92,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
         // Update tracking
         userPositions[user].push(positionKey);
 
-        emit PositionCreated(user, sourceChain, destinationChain, vault, shares);
+        emit Events.PositionCreated(user, sourceChain, destinationChain, vault, shares);
     }
 
     /**
@@ -126,7 +101,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @param positionKey Unique position identifier
      * @param shares New share amount
      */
-    function updatePosition(bytes32 positionKey, uint256 shares) external onlyRoles(HANDLER_ROLE) {
+    function updatePosition(bytes32 positionKey, uint256 shares) external onlyHandler {
         Errors.verifyBytes32(positionKey);
 
         // Get position
@@ -137,7 +112,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
         position.shares = shares;
         position.timestamp = uint64(block.timestamp);
 
-        emit PositionUpdated(positionKey, shares, block.timestamp);
+        emit Events.PositionUpdated(positionKey, shares, block.timestamp);
     }
 
     /**
@@ -145,8 +120,9 @@ contract PositionManager is IPositionManager, OwnableRoles {
      * @dev Sets position to inactive and zeros out shares
      * @param positionKey Unique position identifier
      */
-    function closePosition(bytes32 positionKey) external onlyRoles(HANDLER_ROLE) {
+    function closePosition(bytes32 positionKey) external onlyHandler {
         // Validate position exists
+        // TODO: DUST !? what if theres dust left in the position?
         DataTypes.Position storage position = positions[positionKey];
         if (!position.active) revert Errors.PositionNotFound();
 
@@ -155,7 +131,7 @@ contract PositionManager is IPositionManager, OwnableRoles {
         position.shares = 0;
         position.timestamp = uint64(block.timestamp);
 
-        emit PositionClosed(positionKey);
+        emit Events.PositionClosed(positionKey);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -187,32 +163,6 @@ contract PositionManager is IPositionManager, OwnableRoles {
      */
     function getUserPositionCount(address user) external view returns (uint256) {
         return userPositions[user].length;
-    }
-
-    /**
-     * @notice Configures handler status for an address
-     * @dev Only callable by admin
-     * @param handler Address to configure
-     * @param status Handler status to set
-     */
-    function configureHandler(address handler, bool status) external onlyRoles(ADMIN_ROLE) {
-        Errors.verifyAddress(handler);
-        if (status) {
-            _grantRoles(handler, HANDLER_ROLE);
-        } else {
-            _removeRoles(handler, HANDLER_ROLE);
-        }
-
-        emit HandlerConfigured(handler, status);
-    }
-
-    /**
-     * @notice Checks if an address is a handler
-     * @param handler Address to check
-     * @return bool Handler status
-     */
-    function isHandler(address handler) external view returns (bool) {
-        return hasAnyRole(handler, HANDLER_ROLE);
     }
 
     /**

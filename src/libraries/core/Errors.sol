@@ -9,6 +9,14 @@ pragma solidity 0.8.29;
  */
 library Errors {
     /*//////////////////////////////////////////////////////////////
+                            PROXY ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    error InvalidModule();
+    error RevertEmptyBytes();
+    error LogProxyFail();
+
+    /*//////////////////////////////////////////////////////////////
                             ACCESS CONTROL ERRORS
     //////////////////////////////////////////////////////////////*/
 
@@ -23,6 +31,14 @@ library Errors {
     error NotBridge();
     /// @notice Thrown when caller is not an admin
     error NotAdmin();
+
+    error HandlerAccessDenied();
+    error GovernanceAccessDenied();
+    error EmergencyAccessDenied();
+    error ProtocolAccessDenied();
+    error RegistryAccessDenied();
+    error BridgeAccessDenied();
+    error MinterAccessDenied();
 
     /*//////////////////////////////////////////////////////////////
                             INPUT VALIDATION ERRORS

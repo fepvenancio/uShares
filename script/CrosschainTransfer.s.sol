@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import "../src/USharesToken.sol";
+import "../src/protocol/USharesToken.sol";
 import { Client } from "chainlink/contracts/src/v0.8/ccip/libraries/Client.sol";
 import "forge-std/Script.sol";
 import "forge-std/console.sol";

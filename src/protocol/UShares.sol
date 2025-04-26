@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
+import { IERC4626 } from "../interfaces/IERC4626.sol";
+import { IMessageTransmitter } from "../interfaces/IMessageTransmitter.sol";
+import { IPositionManager } from "../interfaces/IPositionManager.sol";
+import { ITokenMessenger } from "../interfaces/ITokenMessenger.sol";
+import { IVaultRegistry } from "../interfaces/IVaultRegistry.sol";
+import { CCTPAdapter } from "../libraries/logic/CCTPAdapter.sol";
 import { USharesToken } from "./USharesToken.sol";
-import { IERC4626 } from "./interfaces/IERC4626.sol";
-import { IMessageTransmitter } from "./interfaces/IMessageTransmitter.sol";
-import { IPositionManager } from "./interfaces/IPositionManager.sol";
 
-import { ITokenMessenger } from "./interfaces/ITokenMessenger.sol";
-import { IVaultRegistry } from "./interfaces/IVaultRegistry.sol";
-import { CCTPAdapter } from "./libraries/CCTPAdapter.sol";
-
-import { DataTypes } from "./libraries/DataTypes.sol";
-import { Errors } from "./libraries/Errors.sol";
+import { Errors } from "../libraries/core/Errors.sol";
+import { DataTypes } from "../libraries/types/DataTypes.sol";
 import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
 import { ReentrancyGuard } from "solady/utils/ReentrancyGuard.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";

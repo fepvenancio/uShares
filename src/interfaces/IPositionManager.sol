@@ -4,11 +4,6 @@ pragma solidity 0.8.29;
 import { DataTypes } from "../libraries/types/DataTypes.sol";
 
 interface IPositionManager {
-    // Functions
-    function configureHandler(address handler, bool status) external;
-
-    function isHandler(address handler) external view returns (bool);
-
     function createPosition(
         address owner,
         uint32 sourceChain,

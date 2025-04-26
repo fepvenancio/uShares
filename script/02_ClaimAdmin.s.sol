@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { USharesToken } from "../src/USharesToken.sol";
+import { USharesToken } from "../src/protocol/USharesToken.sol";
 import { AddressBook } from "./utils/AddressBook.sol";
 import { Config } from "./utils/Config.s.sol";
 import { RegistryModuleOwnerCustom } from
