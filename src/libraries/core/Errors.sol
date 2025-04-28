@@ -4,8 +4,6 @@ pragma solidity 0.8.29;
 /**
  * @title Errors
  * @notice Library containing all custom errors used in the protocol
- * @dev Centralizes error definitions and provides validation utilities
- * @custom:security-contact security@ushares.com
  */
 library Errors {
     /*//////////////////////////////////////////////////////////////

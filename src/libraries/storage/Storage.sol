@@ -30,14 +30,12 @@ abstract contract Storage {
 
     // ROLES MANAGER ADDRESS
     address internal _rolesManager;
-    // ORACLE ADDRESS
-    address internal _usdcOracle;
-    // USDC Address
+    // CHAINLINK PRICE FEED ADDRESS
+    address internal _usdcChainlinkPriceFeed;
+    // USDC ADDRESS
     address internal _usdc;
     // SIGNED ADDRESS
     address internal _signer;
-    // ERC1155 to mint to users
-    address internal _safeERC1155;
 
     /////////////////////////////////////////
     //  Signature Logic
@@ -54,4 +52,7 @@ abstract contract Storage {
     /// @notice Mapping of position keys to Position structs
     /// @dev Key format: keccak256(abi.encode(owner, sourceChain, destinationChain, destinationVault))
     mapping(bytes32 => DataTypes.Position) public positions;
+
+    /// @notice Mapping of user addresses to their position keys
+    mapping(address => bytes32[]) public userPositions;
 }

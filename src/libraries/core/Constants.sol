@@ -21,8 +21,8 @@ library Constants {
 
     // Public single-proxy modules
     uint256 internal constant MODULEID__INSTALLER = 1; // prettier-ignore
-    uint256 internal constant MODULEID__POSITION_MANAGER = 2; // prettier-ignore
-    uint256 internal constant MODULEID__VAULT_REGISTRY = 3; // prettier-ignore
+    uint256 internal constant MODULEID__VAULT_REGISTRY = 2; // prettier-ignore
+    uint256 internal constant MODULEID__POSITION_MANAGER = 3; // prettier-ignore
     uint256 internal constant MODULEID__MINTER = 4; // prettier-ignore
 
     ////////////////////////////////////////////

@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.29;
 
 import { IERC4626 } from "../../interfaces/IERC4626.sol";
 import { Errors } from "../core/Errors.sol";
 
-library VaultLib {
+library VaultLogic {
     function convertToAssets(address _vault, uint256 _shares) internal view returns (uint256) {
         return IERC4626(_vault).convertToAssets(_shares);
     }

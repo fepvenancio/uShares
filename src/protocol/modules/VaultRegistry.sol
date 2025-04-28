@@ -3,12 +3,11 @@ pragma solidity 0.8.29;
 
 import { IERC4626 } from "../../interfaces/IERC4626.sol";
 import { IVaultRegistry } from "../../interfaces/IVaultRegistry.sol";
-
 import { BaseModule } from "../../libraries/base/BaseModule.sol";
 import { Errors } from "../../libraries/core/Errors.sol";
 import { Events } from "../../libraries/core/Events.sol";
-import { KeyManager } from "../../libraries/logic/KeyManager.sol";
-import { VaultLib } from "../../libraries/logic/VaultLib.sol";
+import { KeyLogic } from "../../libraries/logic/KeyLogic.sol";
+import { VaultLogic } from "../../libraries/logic/VaultLogic.sol";
 import { DataTypes } from "../../libraries/types/DataTypes.sol";
 
 /**
@@ -16,7 +15,7 @@ import { DataTypes } from "../../libraries/types/DataTypes.sol";
  * @notice Registry for tracking vaults and their shares across chains
  */
 contract VaultRegistry is BaseModule, IVaultRegistry {
-    using VaultLib for address;
+    using VaultLogic for address;
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
@@ -50,7 +49,7 @@ contract VaultRegistry is BaseModule, IVaultRegistry {
      * @return Whether the vault is active
      */
     function _isVaultActive(uint32 domain, address vault) internal view returns (bool) {
-        return vaults[KeyManager.getVaultKey(domain, vault)].isActive;
+        return vaults[KeyLogic.getVaultKey(domain, vault)].isActive;
     }
 
     /**
@@ -73,7 +72,7 @@ contract VaultRegistry is BaseModule, IVaultRegistry {
         Errors.verifyAddress(vault);
         vault.isUSDCVault(_usdc);
 
-        bytes32 vaultKey = KeyManager.getVaultKey(domain, vault);
+        bytes32 vaultKey = KeyLogic.getVaultKey(domain, vault);
         Errors.verifyAddress(vaults[vaultKey].vaultAddress);
 
         vaults[vaultKey] = DataTypes.VaultInfo({
@@ -93,7 +92,7 @@ contract VaultRegistry is BaseModule, IVaultRegistry {
      * @param active Whether the vault is active
      */
     function updateVaultStatus(uint32 domain, address vault, bool active) external onlyRegistry whenNotPaused {
-        bytes32 vaultKey = KeyManager.getVaultKey(domain, vault);
+        bytes32 vaultKey = KeyLogic.getVaultKey(domain, vault);
         DataTypes.VaultInfo storage vaultInfo = vaults[vaultKey];
         Errors.verifyAddress(vaultInfo.vaultAddress);
 
@@ -107,7 +106,7 @@ contract VaultRegistry is BaseModule, IVaultRegistry {
      * @param vault The vault address
      */
     function removeVault(uint32 domain, address vault) external onlyRegistry whenNotPaused {
-        bytes32 vaultKey = KeyManager.getVaultKey(domain, vault);
+        bytes32 vaultKey = KeyLogic.getVaultKey(domain, vault);
         DataTypes.VaultInfo memory vaultInfo = vaults[vaultKey];
         Errors.verifyAddress(vaultInfo.vaultAddress);
         Errors.verifyIfActive(vaultInfo.isActive);
@@ -123,6 +122,6 @@ contract VaultRegistry is BaseModule, IVaultRegistry {
      * @return The vault information
      */
     function getVaultInfo(uint32 domain, address vault) external view returns (DataTypes.VaultInfo memory) {
-        return vaults[KeyManager.getVaultKey(domain, vault)];
+        return vaults[KeyLogic.getVaultKey(domain, vault)];
     }
 }

@@ -3,27 +3,25 @@ pragma solidity 0.8.29;
 
 import { IPositionManager } from "../../interfaces/IPositionManager.sol";
 import { IVaultRegistry } from "../../interfaces/IVaultRegistry.sol";
-import { BaseModule } from "../../libraries/base/BaseModule.sol";
-import { Errors } from "../../libraries/core/Errors.sol";
-import { Events } from "../../libraries/core/Events.sol";
-import { KeyManager } from "../../libraries/logic/KeyManager.sol";
-import { DataTypes } from "../../libraries/types/DataTypes.sol";
+import { BaseModule } from "libraries/base/BaseModule.sol";
+import { Errors } from "libraries/core/Errors.sol";
+import { Events } from "libraries/core/Events.sol";
+
+import { KeyLogic } from "libraries/logic/KeyLogic.sol";
+import { DataTypes } from "libraries/types/DataTypes.sol";
 
 /**
  * @title PositionManager
  * @notice Manages user positions across different chains and vaults
- * @dev Tracks and manages user positions in cross-chain vaults
- * @custom:security-contact security@ushares.com
  */
 contract PositionManager is BaseModule, IPositionManager {
-    using KeyManager for *;
+    using KeyLogic for *;
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Mapping of user addresses to their position keys
-    mapping(address => bytes32[]) public userPositions;
     address public _vaultRegistry;
 
     /*//////////////////////////////////////////////////////////////
@@ -31,7 +29,13 @@ contract PositionManager is BaseModule, IPositionManager {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Initializes the PositionManager contract
-    constructor(uint256 moduleId_, bytes32 moduleVersion_, address vaultRegistry_) BaseModule(moduleId_, moduleVersion_) {
+    constructor(
+        uint256 moduleId_,
+        bytes32 moduleVersion_,
+        address vaultRegistry_
+    )
+        BaseModule(moduleId_, moduleVersion_)
+    {
         _vaultRegistry = vaultRegistry_;
     }
 
@@ -72,7 +76,7 @@ contract PositionManager is BaseModule, IPositionManager {
         }
 
         // Generate position key
-        positionKey = KeyManager.getPositionKey(user, sourceChain, destinationChain, vault);
+        positionKey = KeyLogic.getPositionKey(user, sourceChain, destinationChain, vault);
 
         // Check if position already exists
         if (positions[positionKey].active) revert Errors.PositionExists();
@@ -200,6 +204,6 @@ contract PositionManager is BaseModule, IPositionManager {
         pure
         returns (bytes32)
     {
-        return KeyManager.getPositionKey(owner, sourceChain, destinationChain, destinationVault);
+        return KeyLogic.getPositionKey(owner, sourceChain, destinationChain, destinationVault);
     }
 }

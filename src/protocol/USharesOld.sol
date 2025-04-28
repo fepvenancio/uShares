@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
+import { CCTPAdapter } from "../adapters/CCTPAdapter.sol";
 import { IERC4626 } from "../interfaces/IERC4626.sol";
 import { IMessageTransmitter } from "../interfaces/IMessageTransmitter.sol";
 import { IPositionManager } from "../interfaces/IPositionManager.sol";
 import { ITokenMessenger } from "../interfaces/ITokenMessenger.sol";
 import { IVaultRegistry } from "../interfaces/IVaultRegistry.sol";
-import { CCTPAdapter } from "../adapters/CCTPAdapter.sol";
 import { USharesToken } from "./tokenization/USharesToken.sol";
 
 import { Errors } from "../libraries/core/Errors.sol";

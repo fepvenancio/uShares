@@ -8,7 +8,7 @@ import { Errors } from "../../src/libraries/core/Errors.sol";
 import { Events } from "../../src/libraries/core/Events.sol";
 
 import { RolesManager } from "../../src/libraries/core/RolesManager.sol";
-import { KeyManager } from "../../src/libraries/logic/KeyManager.sol";
+import { KeyLogic } from "../../src/libraries/logic/KeyLogic.sol";
 import { DataTypes } from "../../src/libraries/types/DataTypes.sol";
 import { PositionManager } from "../../src/protocol/modules/PositionManager.sol";
 
@@ -32,7 +32,8 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
 
         // Deploy contracts
         vaultRegistry = new MockVaultRegistry();
-        positionManager = new PositionManager(POSITION_MANAGER_MODULE_ID, POSITION_MANAGER_VERSION, address(vaultRegistry));
+        positionManager =
+            new PositionManager(POSITION_MANAGER_MODULE_ID, POSITION_MANAGER_VERSION, address(vaultRegistry));
         rolesManager = new RolesManager(users.admin);
         // Set up vault and handler
         vaultRegistry.updateVaultStatus(destinationChain, users.vault, true);
@@ -58,7 +59,7 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
     function test_CreatePosition() public {
         vm.startPrank(users.handler);
 
-        bytes32 expectedKey = KeyManager.getPositionKey(users.user, sourceChain, destinationChain, users.vault);
+        bytes32 expectedKey = KeyLogic.getPositionKey(users.user, sourceChain, destinationChain, users.vault);
 
         vm.expectEmit(true, true, true, true);
         emit PositionCreated(users.user, sourceChain, destinationChain, users.vault, initialShares);
@@ -225,7 +226,7 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
     }
 
     function test_GetPositionKey() public {
-        bytes32 expectedKey = KeyManager.getPositionKey(users.user, sourceChain, destinationChain, users.vault);
+        bytes32 expectedKey = KeyLogic.getPositionKey(users.user, sourceChain, destinationChain, users.vault);
         bytes32 actualKey = positionManager.getPositionKey(users.user, sourceChain, destinationChain, users.vault);
         assertEq(actualKey, expectedKey);
     }

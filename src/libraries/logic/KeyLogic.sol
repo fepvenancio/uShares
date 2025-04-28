@@ -4,12 +4,10 @@ pragma solidity 0.8.29;
 import { Errors } from "../core/Errors.sol";
 
 /**
- * @title KeyManager
+ * @title KeyLogic
  * @notice Library for handling position and vault keys
- * @dev Provides utilities for generating and validating unique identifiers for positions and vaults
- * @custom:security-contact security@ushares.com
  */
-library KeyManager {
+library KeyLogic {
     /*//////////////////////////////////////////////////////////////
                             KEY GENERATION
     //////////////////////////////////////////////////////////////*/

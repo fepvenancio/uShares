@@ -14,7 +14,7 @@ import { Events } from "../libraries/core/Events.sol";
  */
 contract UShares is Base {
     string public constant NAME = "UShares Protocol";
-    
+
     constructor(address rolesManager, address installerModule) {
         Errors.verifyAddress(rolesManager);
         Errors.verifyAddress(installerModule);
