@@ -2,7 +2,7 @@
 pragma solidity 0.8.29;
 
 import { IRolesManager } from "../../interfaces/IRolesManager.sol";
-import { Errors } from "./Errors.sol";
+import { Errors } from "../../libraries/core/Errors.sol";
 import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
 
 /**

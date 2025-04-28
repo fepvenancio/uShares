@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { PositionManager } from "../../src/protocol/modules/PositionManager.sol";
 import { IVaultRegistry } from "../../src/interfaces/IVaultRegistry.sol";
+
+import { Constants } from "../../src/libraries/core/Constants.sol";
 import { Errors } from "../../src/libraries/core/Errors.sol";
+import { Events } from "../../src/libraries/core/Events.sol";
+
+import { RolesManager } from "../../src/libraries/core/RolesManager.sol";
 import { KeyManager } from "../../src/libraries/logic/KeyManager.sol";
 import { DataTypes } from "../../src/libraries/types/DataTypes.sol";
-import { Constants } from "../../src/libraries/core/Constants.sol";
-import { Events } from "../../src/libraries/core/Events.sol";
+import { PositionManager } from "../../src/protocol/modules/PositionManager.sol";
+
 import { BaseTest } from "../helpers/BaseTest.sol";
 import { MockVaultRegistry } from "../mocks/MockVaultRegistry.sol";
 import { PositionManagerEvents } from "../mocks/PositionManagerEvents.sol";
-import { RolesManager } from "../../src/libraries/core/RolesManager.sol";
-
 import { console2 } from "forge-std/Test.sol";
 import { Ownable } from "solady/auth/Ownable.sol";
 
@@ -30,11 +32,19 @@ contract PositionManagerTest is BaseTest, PositionManagerEvents {
 
         // Deploy contracts
         vaultRegistry = new MockVaultRegistry();
-        positionManager = new PositionManager(POSITION_MANAGER_MODULE_ID, POSITION_MANAGER_VERSION);
+        positionManager = new PositionManager(POSITION_MANAGER_MODULE_ID, POSITION_MANAGER_VERSION, address(vaultRegistry));
         rolesManager = new RolesManager(users.admin);
         // Set up vault and handler
         vaultRegistry.updateVaultStatus(destinationChain, users.vault, true);
         vaultRegistry.updateVaultStatus(destinationChain + 1, users.vault, true);
+
+        // Set the _vaultRegistry and _rolesManager storage slots in PositionManager
+        // _vaultRegistry is at slot 0x4, _rolesManager is at slot 0x3 in Storage.sol
+        vm.store(address(positionManager), bytes32(uint256(4)), bytes32(uint256(uint160(address(vaultRegistry)))));
+        vm.store(address(positionManager), bytes32(uint256(3)), bytes32(uint256(uint160(address(rolesManager)))));
+
+        // Grant handler role to users.handler
+        rolesManager.addHandlerRole(users.handler);
 
         vm.stopPrank();
     }

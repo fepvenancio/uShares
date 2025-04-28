@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import "../src/protocol/USharesToken.sol";
+import "../src/protocol/tokenization/USharesToken.sol";
 import "forge-std/Script.sol";
 
 contract Deploy is Script {
@@ -18,8 +18,9 @@ contract Deploy is Script {
         string memory symbol = "uSHARES";
         uint256 maxSupply = type(uint256).max;
         uint256 preMint = 0;
+        address underlyingToken = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
 
-        USharesToken token = new USharesToken(name, symbol, decimals, maxSupply, preMint);
+        USharesToken token = new USharesToken(name, symbol, decimals, maxSupply, preMint, underlyingToken);
 
         // Grant roles to the pool
         token.grantMintAndBurnRoles(deployer);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { Errors } from "../libraries/core/Errors.sol";
+import { Errors } from "../../libraries/core/Errors.sol";
 import { BurnMintERC677 } from "chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
 
 /**
@@ -20,6 +20,9 @@ contract USharesToken is BurnMintERC677 {
 
     /// @notice The CCIP admin address
     address public ccipAdmin;
+
+    /// @notice The underlying token address
+    address public underlyingToken;
 
     /// @notice Minimum amount for transactions
     uint256 public minAmount = 1e6; // 1 USDC
@@ -60,11 +63,13 @@ contract USharesToken is BurnMintERC677 {
         string memory symbol_,
         uint8 decimals_,
         uint256 maxSupply_,
-        uint256 preMint
+        uint256 preMint,
+        address underlyingToken_
     )
         BurnMintERC677(name_, symbol_, decimals_, maxSupply_)
     {
         ccipAdmin = msg.sender;
+        underlyingToken = underlyingToken_;
 
         // Pre-mint initial supply if requested
         if (preMint > 0) {

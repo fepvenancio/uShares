@@ -4,12 +4,12 @@ pragma solidity 0.8.29;
 import { IERC4626 } from "../../interfaces/IERC4626.sol";
 import { IVaultRegistry } from "../../interfaces/IVaultRegistry.sol";
 
+import { BaseModule } from "../../libraries/base/BaseModule.sol";
 import { Errors } from "../../libraries/core/Errors.sol";
+import { Events } from "../../libraries/core/Events.sol";
 import { KeyManager } from "../../libraries/logic/KeyManager.sol";
 import { VaultLib } from "../../libraries/logic/VaultLib.sol";
 import { DataTypes } from "../../libraries/types/DataTypes.sol";
-import { BaseModule } from "../../libraries/base/BaseModule.sol";
-import { Events } from "../../libraries/core/Events.sol";
 
 /**
  * @title VaultRegistry
@@ -37,7 +37,7 @@ contract VaultRegistry is BaseModule, IVaultRegistry {
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor(uint256 moduleId_, bytes32 moduleVersion_) BaseModule(moduleId_, moduleVersion_) {}
+    constructor(uint256 moduleId_, bytes32 moduleVersion_) BaseModule(moduleId_, moduleVersion_) { }
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -92,15 +92,7 @@ contract VaultRegistry is BaseModule, IVaultRegistry {
      * @param vault The vault address
      * @param active Whether the vault is active
      */
-    function updateVaultStatus(
-        uint32 domain,
-        address vault,
-        bool active
-    )
-        external
-        onlyRegistry
-        whenNotPaused
-    {
+    function updateVaultStatus(uint32 domain, address vault, bool active) external onlyRegistry whenNotPaused {
         bytes32 vaultKey = KeyManager.getVaultKey(domain, vault);
         DataTypes.VaultInfo storage vaultInfo = vaults[vaultKey];
         Errors.verifyAddress(vaultInfo.vaultAddress);

@@ -22,19 +22,18 @@ contract PositionManager is BaseModule, IPositionManager {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Mapping of position keys to Position structs
-    /// @dev Key format: keccak256(abi.encode(owner, sourceChain, destinationChain, destinationVault))
-    mapping(bytes32 => DataTypes.Position) public positions;
-
     /// @notice Mapping of user addresses to their position keys
     mapping(address => bytes32[]) public userPositions;
+    address public _vaultRegistry;
 
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Initializes the PositionManager contract
-    constructor(uint256 moduleId_, bytes32 moduleVersion_) BaseModule(moduleId_, moduleVersion_) {}
+    constructor(uint256 moduleId_, bytes32 moduleVersion_, address vaultRegistry_) BaseModule(moduleId_, moduleVersion_) {
+        _vaultRegistry = vaultRegistry_;
+    }
 
     /*//////////////////////////////////////////////////////////////
                             POSITION MANAGEMENT

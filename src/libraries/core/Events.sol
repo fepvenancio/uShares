@@ -6,8 +6,14 @@ pragma solidity 0.8.29;
  * @notice Library containing events used in the UShares protocol
  */
 library Events {
+    // UShares Protocol
+    event USharesProtocol();
+
     // Proxy
     event ProxyCreated(address indexed proxy, uint256 moduleId);
+
+    // Modules
+    event InstallerAddedModule(uint256 indexed moduleId, address indexed moduleImpl, bytes32 moduleVersion);
 
     // Position Manager
     event PositionCreated(

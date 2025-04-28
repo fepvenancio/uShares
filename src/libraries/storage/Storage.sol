@@ -2,13 +2,12 @@
 pragma solidity ^0.8.19;
 
 import { Constants } from "../core/Constants.sol";
-
 import { RolesManager } from "../core/RolesManager.sol";
 import { DataTypes } from "../types/DataTypes.sol";
 
 /**
  * @title Storage
- * @author Unlockd
+ * @author UShares
  * @notice Storage of the route context for the modules
  */
 abstract contract Storage {
@@ -31,8 +30,6 @@ abstract contract Storage {
 
     // ROLES MANAGER ADDRESS
     address internal _rolesManager;
-    // VAULT REGISTRY ADDRESS
-    address internal _vaultRegistry;
     // ORACLE ADDRESS
     address internal _usdcOracle;
     // USDC Address
@@ -53,4 +50,8 @@ abstract contract Storage {
 
     /// @notice Mapping of vault key to vault info
     mapping(bytes32 => DataTypes.VaultInfo) public vaults;
+
+    /// @notice Mapping of position keys to Position structs
+    /// @dev Key format: keccak256(abi.encode(owner, sourceChain, destinationChain, destinationVault))
+    mapping(bytes32 => DataTypes.Position) public positions;
 }
