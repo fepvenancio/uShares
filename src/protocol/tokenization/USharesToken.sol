@@ -50,7 +50,7 @@ contract USharesToken is BurnMintERC677 {
     }
 
     modifier onlyOwnerOrCCIPAdmin() {
-        require(msg.sender == owner() || msg.sender == ccipAdmin, "Not owner or CCIP admin");
+        if (msg.sender != owner() || msg.sender != ccipAdmin) revert Errors.NotOwnerOrCCIPAdmin();
         _;
     }
 
@@ -64,7 +64,8 @@ contract USharesToken is BurnMintERC677 {
         uint8 decimals_,
         uint256 maxSupply_,
         uint256 preMint,
-        address underlyingToken_
+        address underlyingToken_,
+        address minter
     )
         BurnMintERC677(name_, symbol_, decimals_, maxSupply_)
     {
@@ -73,12 +74,12 @@ contract USharesToken is BurnMintERC677 {
 
         // Pre-mint initial supply if requested
         if (preMint > 0) {
-            _mint(msg.sender, preMint);
+            _mint(minter, preMint);
         }
 
         // Grant minting and burning roles to deployer
-        grantMintRole(msg.sender);
-        grantBurnRole(msg.sender);
+        grantMintRole(minter);
+        grantBurnRole(minter);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -118,20 +119,6 @@ contract USharesToken is BurnMintERC677 {
     function unpause() external onlyOwner {
         paused = false;
         emit Unpaused(msg.sender);
-    }
-
-    /**
-     * @notice Update transaction limits
-     * @param _minAmount New minimum amount
-     * @param _maxAmount New maximum amount
-     */
-    function updateLimits(uint256 _minAmount, uint256 _maxAmount) external onlyOwner {
-        if (_minAmount == 0 || _maxAmount == 0) revert Errors.InvalidAmount();
-        if (_minAmount >= _maxAmount) revert Errors.InvalidConfig();
-
-        minAmount = _minAmount;
-        maxAmount = _maxAmount;
-        emit LimitsUpdated(_minAmount, _maxAmount);
     }
 
     /*//////////////////////////////////////////////////////////////

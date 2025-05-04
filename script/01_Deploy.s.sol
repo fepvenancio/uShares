@@ -20,7 +20,7 @@ contract Deploy is Script {
         uint256 preMint = 0;
         address underlyingToken = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
 
-        USharesToken token = new USharesToken(name, symbol, decimals, maxSupply, preMint, underlyingToken);
+        USharesToken token = new USharesToken(name, symbol, decimals, maxSupply, preMint, underlyingToken, deployer);
 
         // Grant roles to the pool
         token.grantMintAndBurnRoles(deployer);

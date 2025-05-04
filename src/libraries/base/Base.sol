@@ -42,7 +42,6 @@ abstract contract Base is Storage {
     }
 
     // Modifiers
-
     modifier reentrantOK() {
         // documentation only
         _;

@@ -9,16 +9,6 @@ import { Constants } from "../core/Constants.sol";
  */
 library DataTypes {
     /**
-     * @notice Data structure for vault information
-     */
-    struct VaultInfo {
-        address vaultAddress;
-        uint32 domain;
-        uint64 lastUpdate;
-        bool isActive;
-    }
-
-    /**
      * @notice Data structure for cross-chain deposits
      */
     struct CrossChainDeposit {
@@ -42,26 +32,6 @@ library DataTypes {
         uint256 deadline;
         Constants.CrossChainStatus status;
         bool cctpCompleted;
-    }
-
-    /**
-     * @notice Struct containing position information
-     * @param owner The owner of the position
-     * @param sourceChain The chain ID where the position was created
-     * @param destinationChain The chain ID where the vault exists
-     * @param destinationVault The vault address on the destination chain
-     * @param shares The number of shares in the position
-     * @param active Whether the position is active
-     * @param timestamp Last update timestamp
-     */
-    struct Position {
-        address owner;
-        uint32 sourceChain;
-        uint32 destinationChain;
-        address destinationVault;
-        uint256 shares;
-        bool active;
-        uint64 timestamp;
     }
 
     struct PendingDeposit {

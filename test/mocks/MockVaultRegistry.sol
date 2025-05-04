@@ -7,43 +7,22 @@ import { Events } from "../../src/libraries/core/Events.sol";
 import { DataTypes } from "../../src/libraries/types/DataTypes.sol";
 
 contract MockVaultRegistry is IVaultRegistry {
-    mapping(uint32 => mapping(address => bool)) public vaultStatus;
-    mapping(uint32 => mapping(address => DataTypes.VaultInfo)) public vaultInfo;
+    mapping(address => bool) public vaultStatus;
     mapping(uint32 => address) public tokenPools;
 
-    function registerVault(uint32 domain, address vault) external {
-        vaultInfo[domain][vault] = DataTypes.VaultInfo({
-            vaultAddress: vault,
-            domain: domain,
-            lastUpdate: uint64(block.timestamp),
-            isActive: true
-        });
-        vaultStatus[domain][vault] = true;
-        emit Events.VaultRegistered(domain, vault);
+    function registerVault(address vault) external {
+        vaultStatus[vault] = true;
     }
 
-    function updateVaultStatus(uint32 domain, address vault, bool active) external {
-        vaultInfo[domain][vault].isActive = active;
-        vaultStatus[domain][vault] = active;
-        emit Events.VaultUpdated(domain, vault, active);
+    function updateVaultStatus(address vault, bool active) external {
+        vaultStatus[vault] = active;
     }
 
-    function removeVault(uint32 domain, address vault) external {
-        delete vaultInfo[domain][vault];
-        delete vaultStatus[domain][vault];
-        emit Events.VaultRemoved(domain, vault);
+    function removeVault(address vault) external {
+        delete vaultStatus[vault];
     }
 
-    function getVaultInfo(uint32 domain, address vault) external view returns (DataTypes.VaultInfo memory) {
-        return vaultInfo[domain][vault];
-    }
-
-    function isVaultActive(uint32 domain, address vault) external view returns (bool) {
-        return vaultStatus[domain][vault];
-    }
-
-    function configureTokenPool(uint32 domain, address tokenPool) external {
-        tokenPools[domain] = tokenPool;
-        emit Events.TokenPoolConfigured(domain, tokenPool);
+    function isVaultActive(address vault) external view returns (bool) {
+        return vaultStatus[vault];
     }
 }

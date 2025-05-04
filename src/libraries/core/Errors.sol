@@ -37,6 +37,7 @@ library Errors {
     error RegistryAccessDenied();
     error BridgeAccessDenied();
     error MinterAccessDenied();
+    error NotOwnerOrCCIPAdmin();
 
     /*//////////////////////////////////////////////////////////////
                             INPUT VALIDATION ERRORS
@@ -172,10 +173,15 @@ library Errors {
         if (value == 0) revert InvalidAmount();
     }
 
+    function verifyLength(uint256 length, uint256 expected) internal pure {
+        if (length != expected) revert InvalidLength(length, expected);
+    }
+
     // Common errors
     error InvalidAddress(address addr);
     error InvalidDomain(uint32 domain);
-    error InvalidLength(uint256 length);
+    error InvalidChainSelector(uint64 selector);
+    error InvalidLength(uint256 length, uint256 expected);
     error InvalidSignature();
     error AlreadyInitialized();
     error NotInitialized();

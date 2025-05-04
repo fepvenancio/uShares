@@ -22,24 +22,33 @@ library Constants {
     // Public single-proxy modules
     uint256 internal constant MODULEID__INSTALLER = 1; // prettier-ignore
     uint256 internal constant MODULEID__VAULT_REGISTRY = 2; // prettier-ignore
-    uint256 internal constant MODULEID__POSITION_MANAGER = 3; // prettier-ignore
-    uint256 internal constant MODULEID__MINTER = 4; // prettier-ignore
+    uint256 internal constant MODULEID__USHARES_TOKEN_REGISTRY = 3; // prettier-ignore
+    uint256 internal constant MODULEID__CROSS_VAULT = 4; // prettier-ignore
+    uint256 internal constant MODULEID__LOCAL_VAULT = 5; // prettier-ignore
 
     ////////////////////////////////////////////
     // CIRCLE DOMAIN IDS
     ////////////////////////////////////////////
 
-    uint32 public constant Ethereum = 0; // prettier-ignore
-    uint32 public constant Avalanche = 1; // prettier-ignore
-    uint32 public constant Optimism = 2; // prettier-ignore
-    uint32 public constant Arbitrum = 3; // prettier-ignore
-    uint32 public constant Noble = 4; // prettier-ignore
-    uint32 public constant Solana = 5; // prettier-ignore
-    uint32 public constant Base = 6; // prettier-ignore
-    uint32 public constant Polygon = 7; // prettier-ignore
-    uint32 public constant Sui = 8; // prettier-ignore
-    uint32 public constant Aptos = 9; // prettier-ignore
-    uint32 public constant Unichain = 10; // prettier-ignore
+    uint32 public constant ETHEREUM = 0; // prettier-ignore
+    uint32 public constant AVALANCHE = 1; // prettier-ignore
+    uint32 public constant OPTIMISM = 2; // prettier-ignore
+    uint32 public constant ARBITRUM = 3; // prettier-ignore
+    uint32 public constant NOBLE = 4; // prettier-ignore
+    uint32 public constant SOLANA = 5; // prettier-ignore
+    uint32 public constant BASE = 6; // prettier-ignore
+    uint32 public constant POLYGON = 7; // prettier-ignore
+    uint32 public constant SUI = 8; // prettier-ignore
+    uint32 public constant APTOS = 9; // prettier-ignore
+    uint32 public constant UNICHAIN = 10; // prettier-ignore
+
+    ////////////////////////////////////////////
+    // CONSTANT VARS
+    ////////////////////////////////////////////
+
+    uint256 public constant MAX_TIMEOUT = 1 days;
+    uint256 public constant BASIS_POINTS = 10_000;
+    uint256 public constant MAX_FEE = 1000;
 
     ////////////////////////////////////////////
     // VAULT STATE
@@ -63,7 +72,6 @@ library Constants {
      * @notice Status of a cross-chain operation
      */
     enum CrossChainStatus {
-        None,
         Pending,
         Completed,
         Failed

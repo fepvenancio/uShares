@@ -9,4 +9,6 @@ openzeppelin-contracts/=lib/openzeppelin-contracts/
 solady/=lib/solady/src/
 interfaces/=src/interfaces/
 libraries/=src/libraries/
-modules/=src/modules/
+protocol/=src/protocol/
+modules/=src/protocol/modules/
+adapters/=src/protocol/adapters/

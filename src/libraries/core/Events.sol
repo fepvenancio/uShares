@@ -15,21 +15,46 @@ library Events {
     // Modules
     event InstallerAddedModule(uint256 indexed moduleId, address indexed moduleImpl, bytes32 moduleVersion);
 
-    // Position Manager
-    event PositionCreated(
-        address indexed user,
-        uint32 indexed sourceChain,
-        uint32 indexed destinationChain,
-        address destinationVault,
-        uint256 shares
-    );
-    event PositionUpdated(bytes32 indexed positionKey, uint256 newShares, uint256 timestamp);
-    event PositionClosed(bytes32 indexed positionKey);
-    event HandlerConfigured(address indexed handler, bool status);
-
     // Vault Registry
-    event VaultRegistered(uint32 indexed domain, address indexed vault);
-    event VaultUpdated(uint32 indexed domain, address indexed vault, bool active);
-    event VaultRemoved(uint32 indexed domain, address indexed vault);
-    event TokenPoolConfigured(uint32 indexed domain, address indexed tokenPool);
+    event VaultRegistered(address indexed vault);
+    event VaultUpdated(address indexed vault, bool active);
+    event VaultRemoved(address indexed vault);
+
+    // Cross-chain
+    event DepositInitiated(
+        address indexed user, uint32 destinationChain, address indexed vault, uint256 amount, uint256 minSharesExpected
+    );
+    event WithdrawalInitiated(
+        address indexed user, uint32 destinationChain, address indexed vault, uint256 shares, uint256 minUsdcExpected
+    );
+    event LimitsUpdated(uint32 domain, uint256 minAmount, uint256 maxAmount);
+    event CrossChainDepositCompleted(
+        bytes32 indexed depositId, address indexed user, address indexed vault, uint256 shares
+    );
+    event CrossChainWithdrawalInitiated(
+        bytes32 indexed withdrawalId,
+        address indexed user,
+        address indexed vault,
+        uint256 shares,
+        uint256 minUsdcExpected
+    );
+    event CrossChainWithdrawalCompleted(
+        bytes32 indexed withdrawalId, address indexed user, address indexed vault, uint256 usdcAmount
+    );
+    event DepositTimeout(bytes32 indexed depositId, address user, uint256 amount);
+    event WithdrawalTimeout(bytes32 indexed withdrawalId, address user, uint256 shares);
+
+    // uShares Token Registry
+    event USharesTokenCreated(
+        address indexed asset, address indexed uSharesToken, uint256 index
+    );
+    event GenericImplementationUpdated(address indexed genericImpl);
+
+    // BaseModule
+    event FeeUpdated(uint256 oldFee, uint256 newFee);
+    event ChainFeeUpdated(uint32 chain, uint256 oldFee, uint256 newFee);
+    event FeeCollectorUpdated(address oldCollector, address newCollector);
+    event EmergencyWithdraw(address token, uint256 amount, address to);
+    event ChainSelectorUpdated(uint32 chain, uint64 selector);
+    event CrossVaultAddressUpdated(uint32 chain, address crossVault);
 }
